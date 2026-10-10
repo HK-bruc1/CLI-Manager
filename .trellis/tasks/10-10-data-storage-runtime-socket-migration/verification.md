@@ -15,6 +15,7 @@
 - `cargo check --manifest-path src-tauri/Cargo.toml --quiet`：退出 0。
 - `npm run check:architecture -- --strict`：1298 个源码文件，0 超限、0 违规。
 - `git diff --check`：通过。
+- `npm run tauri:build:local -- --bundles nsis --ci`：退出 0，仅生成一个 NSIS bundle；桌面 Vite（7074 modules）与 Web Vite（2058 modules）均成功，Rust release 构建成功。大资源块/动态导入和链接器消息为非致命警告，不在本轮扩大优化范围。
 
 ## 修正与工具边界
 
@@ -22,12 +23,19 @@
 - GitNexus 未暴露，按契约/源码/Git diff 降级，并刷新 codebase-memory 索引：ready，43744 nodes / 117427 edges。抽查确认新端点函数进入 copy -> migrate -> pending 链路；图谱风险标记 CRITICAL/HIGH 已告知用户。
 - memory `detect_changes` 列出预期已跟踪文件，但没有返回 impacted_symbols，也未列出未暂存新文件；不把空结果当“无影响”，提交前复核所有暂存文件和实际调用链。
 
-## 待完成及未覆盖
+## 未覆盖
 
-- 1.4.3 NSIS 生产构建、版本/资源/哈希核验待完成，成功后补记。
 - 未安装程序、未调用真实数据目录切换、未修改 Bootstrap 或真实源目录、未启动或关闭用户服务。实际安装和设置页中英文切换/迁移重启由用户测试。
 - 未执行 Unix 平台测试；Windows GUI 为本轮验证范围。未知或权限不明端点保守拒绝，不提供自动强制迁移。
 
 ## 提交和交付
 
 用户已批准提交本轮修复/测试/Trellis/变更说明后构建 1.4.3 NSIS；不推送。沿用 local release 缓存，但会重新构建当前前端与包含迁移修复的后端，不复用旧版主程序。
+
+- 实现提交：`935bc61f`，`fix(app-data): exclude stopped runtime sockets from migration`。
+- 安装包：`src-tauri/target/local/release/bundle/nsis/CLI-Manager_1.4.3_x64-setup.exe`。
+- 文件大小：30,176,989 bytes；最后修改时间：2026-10-10 15:23:20（Asia/Shanghai）。构建前同路径不存在，无旧包覆盖；旧 1.4.2 文件未改动。
+- SHA256：`45301EF3976B09C15CBE4BF49F52993BB2B9689DC96431C00D0F57DDC9F534C2`。
+- 只读核验四个新产物的 PE header 均为 x64、ProductVersion 均为 1.4.3；主程序包含本次端点探测错误码，前端产物包含新增映射和翻译。
+- 核验实际 `release/nsis/x64/installer.nsi`：引用本次主程序及三个辅助 exe，并包含当前 Web index.html、JS/CSS 和 worker；不安装或运行安装器验证。
+- 重试步骤：退出旧应用，安装本包，停止终端/远程服务/扫码授权等任务，选择独立空目录并执行迁移重启。原目录保留，不手工删除 api.sock；若仍报错保留完整路径与错误信息。

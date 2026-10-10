@@ -15,12 +15,15 @@
   "branch": "fix/data-storage-runtime-socket-migration",
   "base_branch": "master",
   "worktree_path": null,
-  "commit": null,
+  "commit": "935bc61f",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "notes": "Implementation and 1.4.3 NSIS verification complete; user installation and real migration acceptance pending. Not pushed.",
+  "meta": {
+    "installerVersion": "1.4.3",
+    "installerSha256": "45301EF3976B09C15CBE4BF49F52993BB2B9689DC96431C00D0F57DDC9F534C2"
+  }
 }
