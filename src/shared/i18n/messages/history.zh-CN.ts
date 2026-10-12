@@ -117,6 +117,7 @@ export const zh = {
   "history.messageCount": "{count} 条消息",
   "history.updatedAt": "更新于 {time}",
   "history.deleteSession": "删除历史会话",
+  "history.delete.inProgress": "正在删除…",
   "history.deleteSessionNamed": "删除历史会话 {title}",
   "history.delete.readOnly": "远程或只读会话不支持删除",
   "history.delete.unsupported": "此来源尚不支持删除历史会话",
