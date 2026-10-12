@@ -7,15 +7,21 @@
 - `cargo check`、`npx tsc --noEmit` 与 `npm run check:architecture -- --strict`：通过；1300 文件，零超长/新违规。
 - 新增文件 rustfmt 定向格式检查；现有大模块未进行无关全文件格式化。
 
-## 待完成
+## 安装包验收
 
-- 提交后构建 1.4.3 NSIS，核对 SHA256/时间/大小。
+- 实现提交：`cbeddbac`，打包前工作区干净；`npm run tauri:build:local -- --bundles nsis` 返回 0，只生成 NSIS。
+- 桌面与 Web 生产前端构建均成功；本轮逻辑/确认文案已出现在 `HistoryWorkspace` 生产资产中。Rust release 使用 local 缓存，编译完成耗时 4m48s，随后 NSIS 成功。
+- 安装包：`F:\gitRepository\CLI-Manager\src-tauri\target\local\release\bundle\nsis\CLI-Manager_1.4.3_x64-setup.exe`。
+- 文件大小：30,212,757 字节；生成时间：2026-10-12 11:52:36（Asia/Shanghai）；桌面 EXE ProductVersion：1.4.3。
+- SHA256：`334B565DC3E3CA2BC5587BB39FDB61D0EFC61581C70FD2A22C8E9829010F6D6C`，与旧包不同。
+- 上轮迁移修复包保存在同目录 `CLI-Manager_1.4.3_x64-setup.runtime-socket-migration-20261012.exe`，SHA256 仍为 `45301EF3976B09C15CBE4BF49F52993BB2B9689DC96431C00D0F57DDC9F534C2`。
+- 构建只有既有的 bundle identifier、chunk 大小/动态静态混用及 linker 提示，不影响退出成功。未生成 MSI、未安装、未推送。
 
 ## 提交前复核
 
 - `git diff --check` 通过。memory 刷新后 ready（43839 节点/117816 边），抽查新删除入口与收集器均已索引。
-- `detect_changes(scope=all)` 仅列出预期 history/翻译/文档改动，但未报告符号影响且初次不含未暂存新文件；以实际 staged diff、源码调用与编译/定向测试复核，不以空影响结果宣称无风险。
-- 未引入依赖/数据库迁移/终端、Web、Hook、供应商或备份格式改变；新实现模块 256 行左右，责任仅为 Codex 关系删除。
+- `detect_changes(scope=all)` 初次仅列出预期 history/翻译/文档改动，未报告符号影响/未暂存新文件；暂存后及显式 since 也返回空结果，说明不能可靠覆盖本次 staged/commit 差异。以实际 staged diff、源码调用与编译/定向测试复核，不以空影响结果宣称无风险。
+- 未引入依赖/数据库迁移/终端、Web、Hook、供应商或备份格式改变；新实现模块 238 行，责任仅为 Codex 关系删除。
 
 ## 边界
 
