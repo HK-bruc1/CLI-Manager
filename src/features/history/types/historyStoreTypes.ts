@@ -91,7 +91,7 @@ export interface HistoryStore {
   addConvertedSession: (summary: unknown, detail: unknown) => string;
   openSession: (sessionKey: string, options?: OpenSessionOptions) => Promise<void>;
   openSearchHit: (hit: HistorySearchHit) => Promise<void>;
-  deleteSession: (sessionKey: string) => Promise<void>;
+  deleteSession: (sessionKey: string) => Promise<string[]>;
   setGlobalQuery: (query: string) => void;
   runGlobalSearch: (query: string) => Promise<void>;
   setSessionQuery: (query: string) => void;

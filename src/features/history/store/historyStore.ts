@@ -6,7 +6,7 @@ import { createPerfMarker, logWarn } from "../../../shared/platform/logger";
 import { resolveHistoryProjectPath } from "../api/historyProjectPaths";
 import { buildSshAgentHistoryContext } from "../../remote/api/sshAgentHistory";
 import { ensureHistorySourceSettingsLoaded, getHistoryPathArgs } from "../api/historyPathArgs";
-import { assertHistorySessionDeletable, historyDeletedSessionKeys } from "../lib/historyDeletion";
+import { assertHistorySessionDeletable, historyDeletedSessionKeys, type HistoryDeletionCandidate } from "../lib/historyDeletion";
 import { sameHistorySessionIdentity } from "../lib/historySessionIdentity";
 import { extractHistoryTitleCandidate, resolveHistoryDisplayTitle } from "../lib/historyTitle";
 import { useProjectStore } from "../../projects/api/projectStore";
@@ -1080,15 +1080,22 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
     assertHistorySessionDeletable(target);
 
     // 原始来源删除成功后才清理应用元数据；收藏快照不调用文件删除命令。
+    let deletedPaths: string[] | null = null;
     if (!target.favoriteSnapshot) {
-      await invoke("history_delete_session", {
+      deletedPaths = await invoke<string[] | null>("history_delete_session", {
         filePath: target.file_path,
         ...(await getHistoryPathArgs()),
         source: target.source,
         projectKey: target.project_key,
       });
     }
-    const removedSessionKeys = historyDeletedSessionKeys(target, get().sessions);
+    // 搜索命中可能不在当前分页；同 key 的已保存快照仍以列表身份为准，不误清理副本。
+    const candidates = new Map<string, HistoryDeletionCandidate>(get().sessions.map((item) => [item.sessionKey, item]));
+    for (const hit of get().searchHits) {
+      const key = hitSessionKey(hit);
+      if (!candidates.has(key)) candidates.set(key, { ...hit, sessionKey: key });
+    }
+    const removedSessionKeys = historyDeletedSessionKeys(target, [...candidates.values()], deletedPaths);
 
     const db = await getDb();
     for (const key of removedSessionKeys) {
@@ -1117,6 +1124,7 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
     if (nextActiveKey && activeWasDeleted) {
       await get().openSession(nextActiveKey);
     }
+    return [...removedSessionKeys];
   },
 
   setGlobalQuery: (query) => {

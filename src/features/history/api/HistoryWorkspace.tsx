@@ -1195,7 +1195,8 @@ export function HistoryWorkspace({ active = true, onOpenSettings }: HistoryWorks
   const deleteDialogMessage = deleteIntent
     ? deleteIntent.type === "bulk"
       ? t("history.bulk.confirmDeleteMessage", { count: deleteIntent.sessionKeys.length })
-      : t(deleteIntent.session.favoriteSnapshot ? "history.confirmDeleteSnapshotMessage" : "history.confirmDeleteMessage", {
+      : t(deleteIntent.session.favoriteSnapshot ? "history.confirmDeleteSnapshotMessage"
+          : deleteIntent.session.source === "codex" ? "history.confirmDeleteCodexMessage" : "history.confirmDeleteMessage", {
           title: deleteIntent.session.displayTitle,
         })
     : "";
