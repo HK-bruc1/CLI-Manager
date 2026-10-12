@@ -12,16 +12,16 @@
 - Shared policy: `src/features/history/lib/historyDeletion.ts`.
 - `getHistoryDeletionBlockReason(session)` returns a stable rejection code or `null`; `assertHistorySessionDeletable` also rejects missing rows.
 - `planHistoryDeletion(selected)` returns `{ sessionKeys, blockedReason }`.
-- `executeHistoryDeletion(keys, getSessions, deleteSession)` returns `{ deletedCount, error }` after whole-batch preflight and sequential execution.
-- `historyDeletedSessionKeys(target, sessions)` identifies the application rows actually removed by the source operation.
+- `executeHistoryDeletion(keys, getSessions, deleteSession)` returns `{ deletedCount, error }` after whole-batch preflight and sequential execution. Store deletion returns actual covered keys; only these may skip a later selected operation.
+- `historyDeletedSessionKeys(target, sessions, deletedPaths?)` identifies the application rows actually removed by the source operation. Codex success returns canonical deleted paths from IPC; other sources retain null.
 
 ### 3. Contracts
 
 - Each of the twelve existing sources explicitly declares supported deletion in `historySources.ts`, matching the backend `history_sources_list_descriptors` registry in `features/history/sources.rs`. Shared reader templates must not automatically grant future readers write permission. Do not change editing/conversion capabilities with deletion support.
 - List controls, single/bulk request handlers, confirmation execution, and Store use the same policy. SSH or `read_only` rejects before snapshot handling; a local favorite snapshot only deletes saved application data and never invokes source deletion.
-- Preserve independent-subagent restrictions. A batch may merge a selected child only when a selected eligible parent's actual backend deletion covers its file. Any other ineligible selected row blocks the entire batch; never silently omit it and report complete success.
+- Preserve path-based Claude and other-source independent-subagent restrictions. V1.4.3 local Codex ordinary rollout children/forks are independently deletable, irrespective of parent visibility/existence. A batch may merge a selected child only when the actual source deletion covers its file. Any ineligible selected row blocks the entire batch.
 - Recheck every queued key against current Store state before starting a batch. During execution Store checks again; missing rows are errors, not successful no-ops. Real I/O failures stop the queue and report only completed calls.
-- Pi/Gemini/Copilot/Antigravity/Kiro/Cursor/Cline, Kimi/Grok, OpenCode, and snapshots remove only their selected application row. Only the existing Claude/Codex tree path clears actual adjacent `subagents/agent-*.jsonl` rows, with matching source/project. Parent metadata alone does not prove a file was deleted.
+- Pi/Gemini/Copilot/Antigravity/Kiro/Cursor/Cline, Kimi/Grok, OpenCode, and snapshots remove only their selected application row. Claude clears actual adjacent `subagents/agent-*.jsonl` rows with matching source/project. Codex clears only returned physical paths across date/project directories, excluding remote/read-only/snapshot rows. Parent metadata alone never proves a file was deleted.
 - File comparisons normalize Windows prefixes and WSL host/distro aliases, preserving Linux path case. Other roots/projects, remote rows, and independent snapshot rows must survive cleanup.
 - Invoke `history_delete_session` before deleting `session_meta`, generated titles, and favorite snapshots; source failure leaves these and list/detail/search state unchanged. Keep existing star/edit-audit retention.
 - Confirmation copy distinguishes original records from saved snapshots. Disabled reasons and known mutation errors resolve through the history zh-CN/en-US dictionaries; other I/O diagnostics remain available.
@@ -35,7 +35,8 @@
 | SSH/read-only, including a read-only snapshot | No source or metadata deletion |
 | Local saved snapshot | Application cleanup without source IPC |
 | Selected covered Claude/Codex parent and child | One parent operation; clean actual covered rows |
-| Child with only metadata parent or a file-only parent | Reject separate deletion; do not claim it was removed with the parent |
+| Local Codex rollout child/fork with metadata parent | Permit confirmed deletion; cleanup only actual returned files |
+| Other-source child with only metadata parent or a file-only parent | Reject separate deletion; do not claim it was removed with the parent |
 | A queued row vanishes/becomes read-only before confirmation | Preflight fails before any operation |
 | Second operation fails after one success | Stop; report `1/total` and retain failed/unattempted rows |
 
