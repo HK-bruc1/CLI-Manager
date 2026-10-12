@@ -6,7 +6,7 @@ import { createPerfMarker, logWarn } from "../../../shared/platform/logger";
 import { resolveHistoryProjectPath } from "../api/historyProjectPaths";
 import { buildSshAgentHistoryContext } from "../../remote/api/sshAgentHistory";
 import { ensureHistorySourceSettingsLoaded, getHistoryPathArgs } from "../api/historyPathArgs";
-import { assertHistorySessionDeletable, historyDeletedSessionKeys, type HistoryDeletionCandidate } from "../lib/historyDeletion";
+import { assertHistorySessionDeletable, executeHistoryDeletion, historyDeletedSessionKeys, type HistoryDeletionCandidate } from "../lib/historyDeletion";
 import { sameHistorySessionIdentity } from "../lib/historySessionIdentity";
 import { extractHistoryTitleCandidate, resolveHistoryDisplayTitle } from "../lib/historyTitle";
 import { useProjectStore } from "../../projects/api/projectStore";
@@ -314,6 +314,7 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
   loadingSessions: false,
   loadingMoreSessions: false,
   loadingSessionDetail: false,
+  deletingSessions: false,
   searching: false,
   loadingPrompts: false,
   loadingStats: false,
@@ -1072,6 +1073,17 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
       stopPerf({
         messageCount: get().activeSession?.messages.length ?? 0,
       });
+    }
+  },
+
+  // 先同步取得执行权，再进入异步删除；跨组件重开也不能启动重叠队列。
+  deleteSessions: async (sessionKeys) => {
+    if (get().deletingSessions) return null;
+    set({ deletingSessions: true });
+    try {
+      return await executeHistoryDeletion([...sessionKeys], () => get().sessions, get().deleteSession);
+    } finally {
+      set({ deletingSessions: false });
     }
   },
 

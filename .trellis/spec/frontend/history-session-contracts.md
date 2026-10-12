@@ -13,6 +13,7 @@
 - `getHistoryDeletionBlockReason(session)` returns a stable rejection code or `null`; `assertHistorySessionDeletable` also rejects missing rows.
 - `planHistoryDeletion(selected)` returns `{ sessionKeys, blockedReason }`.
 - `executeHistoryDeletion(keys, getSessions, deleteSession)` returns `{ deletedCount, error }` after whole-batch preflight and sequential execution. Store deletion returns actual covered keys; only these may skip a later selected operation.
+- Production confirmations call Store `deleteSessions(keys)`, which synchronously acquires the non-persistent `deletingSessions` flag before its first await and releases it in `finally`. `null` means another queue owns execution; this call performed no deletion and must not show a success/error notification.
 - `historyDeletedSessionKeys(target, sessions, deletedPaths?)` identifies the application rows actually removed by the source operation. Codex success returns canonical deleted paths from IPC; other sources retain null.
 
 ### 3. Contracts
@@ -25,6 +26,7 @@
 - File comparisons normalize Windows prefixes and WSL host/distro aliases, preserving Linux path case. Other roots/projects, remote rows, and independent snapshot rows must survive cleanup.
 - Invoke `history_delete_session` before deleting `session_meta`, generated titles, and favorite snapshots; source failure leaves these and list/detail/search state unchanged. Keep existing star/edit-audit retention.
 - Confirmation copy distinguishes original records from saved snapshots. Disabled reasons and known mutation errors resolve through the history zh-CN/en-US dictionaries; other I/O diagnostics remain available.
+- Single/bulk request and confirmation callbacks synchronously read current Store execution state; rendered `disabled` alone does not prevent same-turn reentry. Lock ownership outlives HistoryWorkspace remounts. List row/bulk/context-menu deletion consume that state. The history confirmation passes optional `ConfirmDialog.pending`; while pending, actions and Escape/outside dismissal are disabled, and the original queue alone emits the final result. Other dialog callers default to existing behavior. Do not convert genuine missing-session errors into success to mask concurrent execution.
 
 ### 4. Validation & Error Matrix
 
@@ -39,6 +41,8 @@
 | Other-source child with only metadata parent or a file-only parent | Reject separate deletion; do not claim it was removed with the parent |
 | A queued row vanishes/becomes read-only before confirmation | Preflight fails before any operation |
 | Second operation fails after one success | Stop; report `1/total` and retain failed/unattempted rows |
+| Repeated confirm/Enter, single versus bulk, or remounted confirmation while deleting | One Store-owned queue; duplicate call returns null without notification; finally releases lock |
+| Pending deletion dialog receives cancel/Escape/outside interaction | No fake cancellation; keep waiting for the unique queue's final result |
 
 ### 5. Good / Base / Bad Cases
 
@@ -49,6 +53,7 @@
 ### 6. Tests Required
 
 - `scripts/historyDeletion.test.mjs` executes shared policy and the real Store action with mocked IPC/database boundaries: all source capabilities, snapshots/read-only, batch preflight/partial failure, file-scope cleanup, WSL comparison, bilingual errors, success cleanup and failure preservation.
+- `scripts/historyDeletionConcurrency.test.mjs` executes the real Store coordinator, Workspace callbacks and shared dialog JSX in memory: original duplicate-confirm repro, same-turn and remounted calls, partial failure/retry, real missing rows, pending dismissal/default compatibility and production wiring.
 - Run relevant history regression scripts, `npx tsc --noEmit`, and standalone `npm run check:architecture -- --strict`.
 - Human desktop validation: delete test sessions for all seven sources and refresh, check mixed-source batches and subagents, switch zh-CN/en-US, retain 24-hour time. AI must not start CLI-Manager/Tauri for UI verification.
 

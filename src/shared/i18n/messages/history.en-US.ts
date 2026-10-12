@@ -119,6 +119,7 @@ export const en: Record<keyof typeof zh, string> = {
   "history.messageCount": "{count} messages",
   "history.updatedAt": "Updated {time}",
   "history.deleteSession": "Delete history session",
+  "history.delete.inProgress": "Deleting…",
   "history.deleteSessionNamed": "Delete history session {title}",
   "history.delete.readOnly": "Remote or read-only sessions cannot be deleted",
   "history.delete.unsupported": "Deleting history sessions is not supported for this source yet",
