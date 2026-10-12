@@ -18,7 +18,15 @@
 
 ## 提交与安装包
 
-- 用户已确认一次提交本轮所有已识别改动后再构建 1.4.3 NSIS；不推送、不自动安装。构建结果待追加。
+- 用户已确认一次提交本轮所有已识别改动后再构建 1.4.3 NSIS；未推送或自动安装。
+- 来源提交：`0b07979e00d92291a7c09d1cabf79354d713be4a`，`fix(history): serialize session deletion confirmations`。构建前和成品检查时工作区均干净。
+- 命令：`npm run tauri:build:local -- --bundles nsis`，退出码 0；桌面/Web 类型及生产构建通过，Rust 缓存增量编译 1m50s，NSIS 只生成 1 个包，未生成 MSI。
+- 新桌面产物含 `deletingSessions`、`history.delete.failed` 和双语等待态键；`HistoryWorkspace-B0Z_TV2W.js` 的 SHA256 为 `855D2C240A78641A13CC4907565622D48A2E05803A8742E6144118E2BE5152E0`。Tauri 编译已将更新的前端嵌入应用，不是仅重封旧可执行文件。
+- 安装包：`src-tauri/target/local/release/bundle/nsis/CLI-Manager_1.4.3_x64-setup.exe`，30,210,162 字节，更新时间 2026-10-12 14:23:16 +08:00；安装包及 `cli-manager.exe` 的 ProductVersion/FileVersion 均为 1.4.3。
+- 安装包 SHA256：`777935BDC733251E80178517900B207AE032F025A62D3EB8408F7A5C4D67CE3A`。
+- 同目录旧包备份：`CLI-Manager_1.4.3_x64-setup.before-batch-delete-20261012-0b07979e.exe`，SHA256 `334B565DC3E3CA2BC5587BB39FDB61D0EFC61581C70FD2A22C8E9829010F6D6C`；原有其他备份保留。
+- 构建有 identifier、分包大小/动态与静态混合导入、MSVC linker stdout 等非阻塞警告，无编译或封装失败。实机批量删除和界面语言切换仍待用户验收，不将隔离测试宣称为真实 UI 测试。
+- 此后仅提交本任务交付记录；文档提交不改变上述安装包来源代码。
 
 ## 工具降级
 
