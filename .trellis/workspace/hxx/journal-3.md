@@ -59,3 +59,35 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 132: 修复 Esc 焦点边框与远程连接设置退出
+
+**Date**: 2026-10-12
+**Task**: 修复 Esc 焦点边框与远程连接设置退出
+**Branch**: `master`
+
+### Summary
+
+修复页面容器焦点边框和隐藏 keepMounted 抽屉阻挡 Esc 退出，按用户要求将代码、任务归档与本日志合并提交。
+
+### Main Changes
+
+- 设置 Esc 保留子弹层事件归属，忽略隐藏弹层和已消费/IME 事件；仅抑制页面外壳原生轮廓。
+- 更新 V1.4.4 CHANGELOG、功能清单及焦点/Esc 交互规范。
+
+### Git Commits
+
+与本次 `fix(settings): 修复 Esc 退出与页面焦点边框` 工作提交合并，包含任务归档及日志。
+
+### Testing
+
+- [OK] 浏览器回归 6/6；相邻 Node 测试 20/20；npx tsc --noEmit；严格架构检查均通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 原生 Tauri 未启动；人工复测空终端 Esc、远程连接首页退出及抽屉逐层退出。
