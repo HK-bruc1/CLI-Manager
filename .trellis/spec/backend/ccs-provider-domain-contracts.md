@@ -177,6 +177,12 @@ legacy cli-manager.db migration unchanged
   `notice`, `tui.status_line`, `tui.model_availability_nux`,
   `windows_wsl_setup_acknowledged` and `projects.<path>.trust_level`.
   These are Home-owned state/preferences, not supplier runtime overrides.
+  When regenerating an existing same-name managed profile, preserve its own
+  Codex-saved `hooks.state` and `projects.<exact-path>.trust_level` decisions.
+  Retain trusted/untrusted without normalizing paths, copying other profile/Home
+  decisions, or accepting supplier-provided trust. Invalid saved project trust
+  must fail without replacing the file. Other prior supplier options are not
+  retained; this does not change the lifecycle of new project-extension profiles.
   Preserve the target Home (including false/empty values), actual Hook
   definitions, features, other TUI/desktop options, project extension fields,
   explicit user profiles and all other non-secret runtime options. Raw stored

@@ -672,15 +672,16 @@ fn codex_config_overrides(provider_id: &str, effective: &Value) -> Result<Vec<St
     Ok(overrides)
 }
 
-// 在默认 Codex 配置根写入使用专用密钥环境变量的供应商 profile 文件，并返回 profile 名称。
+// 在默认 Codex 根更新供应商 profile，保留该同名文件已有的 Hook 用户决定。
 fn write_codex_profile(provider_id: &str, profile_text: &str) -> Result<String, String> {
     let config_dir = home::default_config_root("codex")
         .ok_or_else(|| "provider_snapshot_write_failed".to_string())?;
     let profile_name = crate::provider::runtime::codex_profile_name(provider_id);
-    write_snapshot_file(
+    super::codex_profile::write_preserving_hook_state(
         &config_dir.join(format!("{profile_name}.config.toml")),
-        profile_text.as_bytes(),
-    )?;
+        profile_text,
+    )
+    .map_err(|error| format!("provider_snapshot_write_failed: {error}"))?;
     Ok(profile_name)
 }
 

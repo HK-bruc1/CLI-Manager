@@ -1,6 +1,14 @@
 import type { zh } from "./settings.zh-CN";
 
 export const en: Record<keyof typeof zh, string> = {
+  "settings.hooks.codex.profileNameInvalid": "The current terminal has an invalid Codex profile name.",
+  "settings.hooks.codex.profileMissing": "The current terminal profile file is missing. Check the config directory or create a new terminal.",
+  "settings.hooks.codex.configInvalid": "Codex config could not be parsed. The original file was not changed.",
+  "settings.hooks.codex.effectiveScope": "Inspected effective config",
+  "settings.hooks.codex.checkUnavailable": "Not checked or check failed",
+  "settings.hooks.codex.pendingReview": "Codex review required",
+  "settings.hooks.codex.reviewHint": "Hooks are installed, but this config has unconfirmed, changed, or disabled hooks. Review them with /hooks in this Codex terminal; reinstalling does not grant trust.",
+
   "settings.terminal.externalProgram": "External terminal program",
   "settings.terminal.externalProgramDescription": "Choose the program that opens external windows; the project Shell determines the command environment. Applies to external mode and Open External Terminal. Windows may host the window in its default terminal.",
   "settings.terminal.externalOpenFailed": "Unable to open external terminal",

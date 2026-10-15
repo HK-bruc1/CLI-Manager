@@ -1,11 +1,16 @@
 mod codex;
+#[cfg(test)]
+use codex::codex_hooks_feature_installed;
 use codex::{
-    codex_cli_manager_hook_state_keys, codex_cli_manager_hooks_trusted,
-    codex_hook_state_event_name, codex_hook_trusted_hash, codex_hooks_feature_installed,
+    codex_cli_manager_hook_state_keys, codex_hook_state_event_name, codex_hook_trusted_hash,
     deduplicate_codex_hook_state_blocks, install_codex_hook_module, install_codex_hooks,
     merge_codex_common_config_toml, remove_marker_owned_codex_hook_state_blocks,
     toml_escape_basic_string, trim_empty_lines, uninstall_codex_hook_module, uninstall_codex_hooks,
 };
+mod codex_status;
+#[cfg(test)]
+use codex_status::build_codex_status;
+use codex_status::build_codex_status_for_profile;
 mod grok;
 use grok::{
     build_grok_status, disable_grok_cross_vendor_hooks, install_grok_hook_module,
@@ -104,6 +109,8 @@ pub struct ToolHookSettingsStatus {
     hooks_dir: Option<String>,
     config_path: Option<String>,
     feature_config_path: Option<String>,
+    effective_config_path: Option<String>,
+    hooks_trusted: bool,
     status: HookInstallStatus,
     attention_script_installed: bool,
     finished_script_installed: bool,
@@ -170,6 +177,7 @@ pub async fn hook_settings_get_status(
     _app: AppHandle,
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -202,7 +210,7 @@ pub async fn hook_settings_get_status(
 
     let claude = build_claude_status(claude_dir.clone())?;
     // 状态查询不代表用户授权信任或重新启用 Hook。
-    let codex = build_codex_status(codex_dir.clone())?;
+    let codex = build_codex_status_for_profile(codex_dir.clone(), codex_profile_name.as_deref())?;
     let kimi = build_kimi_status(kimi_dir.clone())?;
     let pi = build_pi_status(pi_dir.clone())?;
     let grok = build_grok_status(grok_dir.clone())?;
@@ -223,6 +231,7 @@ pub async fn hook_settings_install(
     _app: AppHandle,
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -250,7 +259,7 @@ pub async fn hook_settings_install(
         true,
     )
     .await;
-    let codex = build_codex_status(codex_dir.clone())?;
+    let codex = build_codex_status_for_profile(codex_dir.clone(), codex_profile_name.as_deref())?;
     let kimi = build_kimi_status(kimi_dir.clone())?;
     let pi = build_pi_status(pi_dir.clone())?;
     let grok = build_grok_status(grok_dir.clone())?;
@@ -270,6 +279,7 @@ pub async fn hook_settings_uninstall(
     _app: AppHandle,
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -297,7 +307,7 @@ pub async fn hook_settings_uninstall(
         requested_module.is_some(),
     )
     .await;
-    let codex = build_codex_status(codex_dir.clone())?;
+    let codex = build_codex_status_for_profile(codex_dir.clone(), codex_profile_name.as_deref())?;
     let kimi = build_kimi_status(kimi_dir.clone())?;
     let pi = build_pi_status(pi_dir.clone())?;
     let grok = build_grok_status(grok_dir.clone())?;
@@ -317,6 +327,7 @@ pub async fn hook_settings_install_codex(
     _app: AppHandle,
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -335,7 +346,7 @@ pub async fn hook_settings_install_codex(
     } else {
         install_codex_hooks(&codex_dir)?;
     }
-    let codex = build_codex_status(Some(codex_dir.clone()))?;
+    let codex = build_codex_status_for_profile(Some(codex_dir.clone()), codex_profile_name.as_deref())?;
     sync_ccswitch_for_tool_status(
         cc_switch_db_path,
         &codex_dir,
@@ -364,6 +375,7 @@ pub async fn hook_settings_uninstall_codex(
     _app: AppHandle,
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -383,7 +395,7 @@ pub async fn hook_settings_uninstall_codex(
         uninstall_codex_hooks(&codex_dir)?;
     }
     let claude = build_claude_status(claude_dir.clone())?;
-    let codex = build_codex_status(Some(codex_dir.clone()))?;
+    let codex = build_codex_status_for_profile(Some(codex_dir.clone()), codex_profile_name.as_deref())?;
     let kimi = build_kimi_status(kimi_dir.clone())?;
     sync_ccswitch_for_tool_status(
         cc_switch_db_path,
@@ -410,6 +422,7 @@ pub async fn hook_settings_uninstall_codex(
 pub async fn hook_settings_install_kimi(
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -426,7 +439,7 @@ pub async fn hook_settings_install_kimi(
     install_kimi_hooks(&kimi_dir, &modules)?;
     Ok(HookSettingsStatus {
         claude: build_claude_status(claude_dir)?,
-        codex: build_codex_status(codex_dir)?,
+        codex: build_codex_status_for_profile(codex_dir, codex_profile_name.as_deref())?,
         kimi: build_kimi_status(Some(kimi_dir))?,
         pi: build_pi_status(pi_dir)?,
         grok: build_grok_status(grok_dir)?,
@@ -439,6 +452,7 @@ pub async fn hook_settings_install_kimi(
 pub async fn hook_settings_uninstall_kimi(
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -455,7 +469,7 @@ pub async fn hook_settings_uninstall_kimi(
     uninstall_kimi_hooks(&kimi_dir, &modules)?;
     Ok(HookSettingsStatus {
         claude: build_claude_status(claude_dir)?,
-        codex: build_codex_status(codex_dir)?,
+        codex: build_codex_status_for_profile(codex_dir, codex_profile_name.as_deref())?,
         kimi: build_kimi_status(Some(kimi_dir))?,
         pi: build_pi_status(pi_dir)?,
         grok: build_grok_status(grok_dir)?,
@@ -468,6 +482,7 @@ pub async fn hook_settings_uninstall_kimi(
 pub async fn hook_settings_install_pi(
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -486,7 +501,7 @@ pub async fn hook_settings_install_pi(
         install_pi_hooks(&pi_dir)?;
     }
     let claude = build_claude_status(claude_dir.clone())?;
-    let codex = build_codex_status(codex_dir.clone())?;
+    let codex = build_codex_status_for_profile(codex_dir.clone(), codex_profile_name.as_deref())?;
     let kimi = build_kimi_status(kimi_dir.clone())?;
     let pi = build_pi_status(Some(pi_dir.clone()))?;
     let grok = build_grok_status(grok_dir.clone())?;
@@ -505,6 +520,7 @@ pub async fn hook_settings_install_pi(
 pub async fn hook_settings_uninstall_pi(
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -523,7 +539,7 @@ pub async fn hook_settings_uninstall_pi(
         uninstall_pi_hooks(&pi_dir)?;
     }
     let claude = build_claude_status(claude_dir.clone())?;
-    let codex = build_codex_status(codex_dir.clone())?;
+    let codex = build_codex_status_for_profile(codex_dir.clone(), codex_profile_name.as_deref())?;
     let kimi = build_kimi_status(kimi_dir.clone())?;
     let pi = build_pi_status(Some(pi_dir.clone()))?;
     let grok = build_grok_status(grok_dir.clone())?;
@@ -542,6 +558,7 @@ pub async fn hook_settings_uninstall_pi(
 pub async fn hook_settings_install_grok(
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -562,7 +579,7 @@ pub async fn hook_settings_install_grok(
     // Always enforce cross-vendor hook isolation on install (full or module).
     disable_grok_cross_vendor_hooks(&grok_dir)?;
     let claude = build_claude_status(claude_dir.clone())?;
-    let codex = build_codex_status(codex_dir.clone())?;
+    let codex = build_codex_status_for_profile(codex_dir.clone(), codex_profile_name.as_deref())?;
     let kimi = build_kimi_status(kimi_dir.clone())?;
     let pi = build_pi_status(pi_dir.clone())?;
     let grok = build_grok_status(Some(grok_dir.clone()))?;
@@ -581,6 +598,7 @@ pub async fn hook_settings_install_grok(
 pub async fn hook_settings_uninstall_grok(
     selected_dir: Option<String>,
     codex_selected_dir: Option<String>,
+    codex_profile_name: Option<String>,
     kimi_selected_dir: Option<String>,
     pi_selected_dir: Option<String>,
     grok_selected_dir: Option<String>,
@@ -600,7 +618,7 @@ pub async fn hook_settings_uninstall_grok(
     }
     // Do not re-enable compat.*.hooks on uninstall (product decision).
     let claude = build_claude_status(claude_dir.clone())?;
-    let codex = build_codex_status(codex_dir.clone())?;
+    let codex = build_codex_status_for_profile(codex_dir.clone(), codex_profile_name.as_deref())?;
     let kimi = build_kimi_status(kimi_dir.clone())?;
     let pi = build_pi_status(pi_dir.clone())?;
     let grok = build_grok_status(Some(grok_dir.clone()))?;
@@ -1563,70 +1581,6 @@ fn build_claude_status(claude_dir: Option<PathBuf>) -> Result<ToolHookSettingsSt
     ))
 }
 
-// 检查 Codex 事件、提问 matcher、hooks 开关和信任哈希并汇总状态。
-fn build_codex_status(codex_dir: Option<PathBuf>) -> Result<ToolHookSettingsStatus, String> {
-    let Some(codex_dir) = codex_dir else {
-        return missing_status();
-    };
-
-    let hooks_dir = codex_dir.join("hooks");
-    let hooks_path = codex_dir.join(CODEX_HOOKS_FILE_NAME);
-    let config_path = codex_dir.join(CODEX_CONFIG_FILE_NAME);
-    let exe = hook_exe_for_dir(&codex_dir).ok();
-    let settings = read_json_if_exists(&hooks_path)?;
-    let registered = |event: &str| {
-        exe.as_deref().is_some_and(|exe| {
-            exact_command_registered(&settings, event, &build_command(exe, "codex", event))
-        })
-    };
-    let checks = ToolChecks {
-        attention_script_installed: exe.is_some(),
-        finished_script_installed: exe.is_some(),
-        session_start_hook_installed: registered("SessionStart"),
-        running_hook_installed: registered("UserPromptSubmit"),
-        attention_hook_installed: registered("PermissionRequest")
-            && registered_exact_command_with_matcher(
-                &settings,
-                exe.as_deref(),
-                "PreToolUse",
-                "codex",
-                "Notification",
-                CODEX_QUESTION_TOOL_MATCHER,
-            ),
-        attention_hook_required: true,
-        stop_hook_installed: registered("Stop"),
-        failure_hook_installed: false,
-        failure_hook_required: false,
-        subagent_start_hook_installed: registered("SubagentStart")
-            && registered("SubagentStop")
-            && registered_exact_command(
-                &settings,
-                exe.as_deref(),
-                "PreToolUse",
-                "codex",
-                "ToolStart",
-            )
-            && registered_exact_command(
-                &settings,
-                exe.as_deref(),
-                "PostToolUse",
-                "codex",
-                "ToolStop",
-            ),
-        subagent_start_hook_required: true,
-        hooks_feature_installed: codex_hooks_feature_installed(&config_path)?,
-        hooks_trusted: codex_cli_manager_hooks_trusted(&settings, &hooks_path, &config_path)?,
-    };
-
-    Ok(status_from_checks(
-        Some(codex_dir),
-        Some(hooks_dir),
-        Some(hooks_path),
-        Some(config_path),
-        checks,
-    ))
-}
-
 // 仅由用户明确安装/修复调用：去重当前托管键，不生成信任或覆盖禁用状态。
 fn repair_duplicate_codex_hook_state_blocks(codex_dir: &Path) -> Result<(), String> {
     let hooks_path = codex_dir.join(CODEX_HOOKS_FILE_NAME);
@@ -1669,6 +1623,8 @@ fn missing_status() -> Result<ToolHookSettingsStatus, String> {
         hooks_dir: None,
         config_path: None,
         feature_config_path: None,
+        effective_config_path: None,
+        hooks_trusted: false,
         status: HookInstallStatus::DirectoryMissing,
         attention_script_installed: false,
         finished_script_installed: false,
@@ -1718,6 +1674,8 @@ fn status_from_checks(
         config_dir: config_dir.as_deref().map(path_to_string),
         hooks_dir: hooks_dir.as_deref().map(path_to_string),
         config_path: config_path.as_deref().map(path_to_string),
+        effective_config_path: feature_config_path.as_deref().map(path_to_string),
+        hooks_trusted: checks.hooks_trusted,
         feature_config_path: feature_config_path.as_deref().map(path_to_string),
         status,
         attention_script_installed: checks.attention_script_installed,
