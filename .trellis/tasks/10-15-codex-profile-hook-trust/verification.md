@@ -29,4 +29,17 @@
 - 尚未运行安装后的真实窗口/中英文切换或 WSL/SSH 环境验收，未安装、重启用户程序、修改真实配置/Hook/信任，也未调用供应商模型。用户安装后需验证当前供应商终端 `/hooks`，再关闭并新建同一供应商终端，检查决定保留和灯色。
 - 如果旧版本已抹掉确认，需要在 Codex 中再确认一次；新独立项目 profile、定义变更或显式禁用仍由 Codex 审核，不承诺全部自动绿色。
 - 写入检测到外部变化会失败以保护用户决定；最后字节检查与 rename 之间仍有极短跨进程竞态，不宣称 CAS。新包不可修复用户手动删除/损坏的 profile，错误会显式报告。
-- 构建/安装包证据待下节补充：先本地提交，再使用缓存执行 `npm run tauri:build:local -- --bundles nsis`，保留旧包、不安装、不推送。
+- 已先提交再构建，安装包证据见下；没有安装、启动应用或推送。
+
+
+## 安装包交付
+
+- 来源提交：`e6c1632e458e4c67da0b4d7b9d7f49f0e005755f`（`fix/codex-profile-hook-trust`）。打包前工作区干净。
+- 命令：`npm run tauri:build:local -- --bundles nsis`，退出 0；桌面与 Web 生产构建通过，复用 `src-tauri/target/local` Rust 依赖缓存，release 编译 3m10s，只生成 1 个 NSIS 包。仅有既有 chunk/标识符提示和 Windows 链接器信息警告。
+- 文件：`F:\gitRepository\CLI-Manager\src-tauri\target\local\release\bundle\nsis\CLI-Manager_1.4.3_x64-setup.exe`
+- 版本：release 主程序 FileVersion/ProductVersion 均 `1.4.3`。
+- 时间：`2026-10-15 12:14:25 +08:00`；大小：`30,202,263` 字节。
+- SHA256：`9A656E2A09D47F451E58A18351B93D5F275B9003AAD67989DAEB91DD688AE9B7`。
+- 原包备份：同目录 `CLI-Manager_1.4.3_x64-setup.before-codex-profile-trust-20261015.exe`，`30,210,162` 字节，SHA256 `777935BDC733251E80178517900B207AE032F025A62D3EB8408F7A5C4D67CE3A`；未覆盖旧备份。
+- 构建后源代码没有额外变更。GitNexus 不可用时的 detect_changes 已执行；暂存模式返回空集，已明确以真实 staged diff 审核为准（不是“无影响”）。过程降级另存本地忽略文件 `.codex/operations-log.md`。
+- Trellis 保持待用户验收，不提前归档。重点测试：选择有 profile 的本机 Codex 终端 → `/hooks` 检查/确认 → 可见窗口最多约 10 秒刷新 → 关闭并重建同一供应商终端，确认不会因覆盖再次要求审核；切换终端后路径和灯色不串用。
