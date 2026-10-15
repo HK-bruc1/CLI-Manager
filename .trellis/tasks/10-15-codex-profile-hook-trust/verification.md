@@ -54,3 +54,13 @@
 - moderate 索引已更新至 44057 节点、118354 边；抽查 preserve_project_trust 确实被 profile_with_saved_state 调用。detect_changes 返回预期 9 个变更文件但 impacted_symbols 为空，因此以源码调用及真实 git diff 复核为准。
 - 未运行安装版 GUI、新旧语言切换、WSL/SSH 或实际 Codex 信任交互；不读取/改写用户密钥、不修改真实配置和信任、不关闭用户终端。
 - 同名 profile 中原先已被旧包抹掉的决定仍需用户确认一次；新独立项目扩展 profile、不曾信任的目录不自动授权。现有写前字节检查不保证跨进程 CAS。
+
+### 第二轮安装包（目录信任补全）
+
+- 来源提交 `ca649e5b2ebdb9624a16e68eb472df16257cdce4`；提交后干净工作区构建，构建后无源码变化。
+- `npm run tauri:build:local -- --bundles nsis` 退出 0；桌面/Web 生产构建通过，复用 local release 缓存，Rust release 4m54s。仅生成 NSIS，未构建 MSI；既有 chunk/标识符/链接器提示，无构建错误。
+- 文件：`F:\gitRepository\CLI-Manager\src-tauri\target\local\release\bundle\nsis\CLI-Manager_1.4.3_x64-setup.exe`
+- 时间：2026-10-15 14:22:51 +08:00；大小 30,205,402 字节；主程序 FileVersion/ProductVersion 均为 1.4.3。
+- SHA256：`8549BCF98A94FBA43B26C0488D90263DD3B4F7144827C89BDF1F5DA4171476BB`。
+- 本轮旧包备份为同目录 `CLI-Manager_1.4.3_x64-setup.before-directory-trust-20261015-141158.exe`。未安装或推送。
+- 人工验收：退出旧版应用后安装本包，重开同一供应商的项目；若旧版已清掉记录，确认一次，然后连续重开两次确认不再弹出。待审核 Hook 点击应安装/重装，完整安装绿色状态点击仍打开设置。

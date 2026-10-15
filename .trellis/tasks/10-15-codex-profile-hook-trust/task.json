@@ -15,19 +15,19 @@
   "branch": "fix/codex-profile-hook-trust",
   "base_branch": "master",
   "worktree_path": null,
-  "commit": "e6c1632e458e4c67da0b4d7b9d7f49f0e005755f",
+  "commit": "ca649e5b2ebdb9624a16e68eb472df16257cdce4",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "用户追加目录信任保留和 Hook 按钮回归修复，沿用 1.4.3；完成后先提交再 NSIS，不推送。",
+  "notes": "目录信任保留和 Hook 按钮回归已提交；292 项 Rust、9 项前端定向测试及类型/严格架构检查通过；1.4.3 NSIS 已构建，待用户验收，未安装或推送。",
   "meta": {
     "installerVersion": "1.4.3",
     "relatedTask": "10-08-codex-provider-config-propagation",
-    "deliveryState": "implementing_verification_followup",
-    "installerSha256": "9A656E2A09D47F451E58A18351B93D5F275B9003AAD67989DAEB91DD688AE9B7",
-    "installerBytes": 30202263,
-    "installerBuiltAt": "2026-10-15T12:14:25+08:00"
+    "deliveryState": "awaiting_user_verification",
+    "installerSha256": "8549BCF98A94FBA43B26C0488D90263DD3B4F7144827C89BDF1F5DA4171476BB",
+    "installerBytes": 30205402,
+    "installerBuiltAt": "2026-10-15T14:22:51+08:00"
   }
 }
