@@ -16,6 +16,16 @@
 
 ### 3. Contracts
 
+- Legacy statistics-index snapshots share immutable `CachedSessionComputation.stats`
+  through `Arc`; metadata changes must not deep-copy usage events. Mutating stats
+  requires copy-on-write. JSON cache schema/version and external DTOs stay unchanged.
+- Read/write the legacy JSON cache using buffered streams, never a full-file byte
+  buffer; publish only after successful serialization and flush. Failed writes keep
+  the previous cache. Shared-index refresh holds one mutex and rechecks TTL inside
+  it; parallel parsing is capped at four workers.
+- Background request-log sync filters fingerprints before document materialization
+  and writes one changed document at a time. Unchanged files still participate in
+  missing-file detection; inaccessible sources must not purge stored logs.
 - The catalog DB is derived and rebuildable; never store it in `cli-manager.db` or treat it as user-authored data.
 - List requests query cached summaries first and schedule fingerprint-based background refresh. Catalog collection includes local/WSL Kimi Code `sessions/<workDirKey>/<sessionId>/agents/main/wire.jsonl` using the same `HistoryRoots.kimi_config_dir` / `$KIMI_CODE_HOME` / `~/.kimi-code` resolution as the disk collectors; nested `agents/agent-*` wires stay out of the catalog.
 - Exact Codex UUID queries (`source=codex`, `limit=1`, `offset=0`) take the direct rollout path before opening or refreshing the catalog. Enumerate filenames only under the resolved Codex sessions root, match `rollout-*-<sessionId>.jsonl`, and parse only matching candidates. Local enumeration does not follow links; WSL uses the existing guest `find` boundary. Verify metadata identity and optional project path, reject ambiguous matches, and preserve the thread-name overlay. Missing/deleted files return no match even if the catalog is dirty or stale; never substitute a recent neighbor session. Text search, other sources, and pagination keep their existing catalog semantics.
