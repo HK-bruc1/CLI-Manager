@@ -315,7 +315,8 @@ export function SettingsModal({ open, onClose, onAfterClose, initialTab, onActiv
   useEffect(() => {
     if (!mounted || closing) return;
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+      // 长按 Esc 不能在子窗关闭后继续穿透；下一次独立按键才属于设置页。
+      if (event.key !== "Escape" || event.repeat || event.isComposing || event.defaultPrevented) return;
       // 上层还有弹框（供应商维护、SSH 主机维护、插件安装等）时，Escape 归它处理，设置页不参与
       if (hasOverlayAboveSettings(dialogRef.current, event)) return;
       event.preventDefault();
