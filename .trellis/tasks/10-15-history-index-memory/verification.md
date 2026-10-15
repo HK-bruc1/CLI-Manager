@@ -28,3 +28,15 @@
 - 扫描并发最多 4，冷启动吞吐可能低于此前按全部 CPU 并发；取舍是降低峰值。流式 JSON 避免完整字节缓冲，但不是消除解析对象。
 - 共享刷新互斥按源码验证，未模拟所有 WSL/SSH 或安装版跨窗口竞态。原有缓存失效与派生索引生命周期保持。
 - GitNexus 未提供；使用 codebase-memory、契约、源码和 git diff 复核，索引结果不替代源码证据。
+
+## 构建交付
+
+- 源码提交：`66b57532b9b10da3b96ab51b0b25935c47a67dce`，先提交、干净工作区构建；构建后没有源码额外变化。
+- `npm run tauri:build:local -- --bundles nsis` 退出 0，桌面/Web 生产构建通过，复用 local release 缓存（Rust 4m36s）。仅 NSIS，不构建 MSI、不安装、不推送。
+- 安装包：`F:\gitRepository\CLI-Manager\src-tauri\target\local\release\bundle\nsis\CLI-Manager_1.4.3_x64-setup.exe`。
+- 时间：2026-10-15 15:57:24 +08:00；大小：30,184,002 字节；主程序 FileVersion/ProductVersion 均为 1.4.3。
+- SHA256：`D6B2B8B687D6628EA20334D69A6592F37DD9F6453A04CE470B9116C4A0134A2D`。
+- 原包保留为同目录 `CLI-Manager_1.4.3_x64-setup.before-history-memory-20261015-154827.exe`。
+- 仅有既有前端 chunk/动态导入、bundle identifier、Windows 链接器提示，没有构建失败。
+- 实现后索引重建至 44204 节点；detect_changes 返回已跟踪变更但遗漏未跟踪测试/任务且符号为空，实际暂存 diff 与新增文件逐项复核；共 18 个预期文件。验证真实入口调用 read/write 流式 helper、Arc stats 构造、刷新锁与请求预筛选。
+- 用户验收建议：退出旧版安装后以相同终端数量运行至少 5 分钟，覆盖多个 60 秒同步周期，并打开/关闭历史和统计；观察主进程与 WebView 分别占用，确认历史/用量无缺失。Trellis 待用户验收，不提前归档。

@@ -15,14 +15,18 @@
   "branch": "fix/history-index-memory",
   "base_branch": "master",
   "worktree_path": null,
-  "commit": null,
+  "commit": "66b57532b9b10da3b96ab51b0b25935c47a67dce",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "用户同意新任务、沿用 1.4.3；验证后提交再构建 NSIS，不推送。",
+  "notes": "218 项相关 Rust 测试通过，显式 legacy/shared 合成探针分别通过，类型/架构检查通过；已提交并构建 1.4.3 NSIS，待用户实测，不推送。",
   "meta": {
-    "installerVersion": "1.4.3"
+    "installerVersion": "1.4.3",
+    "deliveryState": "awaiting_user_verification",
+    "installerSha256": "D6B2B8B687D6628EA20334D69A6592F37DD9F6453A04CE470B9116C4A0134A2D",
+    "installerBytes": 30184002,
+    "installerBuiltAt": "2026-10-15T15:57:24+08:00"
   }
 }
