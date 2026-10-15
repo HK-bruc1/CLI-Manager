@@ -64,7 +64,7 @@ import type { TerminalProcessTraits } from "../transport/PtyHostSocket";
 import { TERMINAL_SCROLLBACK_ROWS_DEFAULT, useSettingsStore } from "../../../shared/preferences/settingsStore";
 import { toast } from "sonner";
 import { logError, logInfo, logWarn } from "../../../shared/platform/logger";
-import { registerTerminalSnapshotSource } from "../api/sessionSnapshotPersistence";
+import { registerTerminalSnapshotSource, serializeTerminalAfterWrite } from "../api/sessionSnapshotPersistence";
 import {
   type TerminalSubsystemDisposable, type CodexImeDebugState, summarizeTextForDiagnostics,
   disposeTerminalSubsystem, canShowSuggestionAtCurrentInputEnd, withVisibleSelectionTheme,
@@ -1073,9 +1073,9 @@ export function useXTermController({ sessionId, isActive = true, isVisible = tru
     linkHoverIcon = createTerminalLinkHoverIcon(terminal, containerRef.current, fontSize);
     baseDisposables.push(linkHoverIcon);
     // 注册定时节流落盘的快照来源：让崩溃/强杀也能恢复到最近一次落盘的画面。
-    const serializeAfterWriteBarrier = () => new Promise<string>((resolve) => {
-      terminal.write("", () => resolve(serializeAddon.serialize()));
-    });
+    const serializeAfterWriteBarrier = (signal: AbortSignal) => serializeTerminalAfterWrite(
+      terminal, () => serializeAddon.serialize(), signal,
+    );
     const unregisterSnapshotSource = registerTerminalSnapshotSource(
       sessionId,
       serializeAfterWriteBarrier,
