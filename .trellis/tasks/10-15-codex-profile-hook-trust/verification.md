@@ -43,3 +43,14 @@
 - 原包备份：同目录 `CLI-Manager_1.4.3_x64-setup.before-codex-profile-trust-20261015.exe`，`30,210,162` 字节，SHA256 `777935BDC733251E80178517900B207AE032F025A62D3EB8408F7A5C4D67CE3A`；未覆盖旧备份。
 - 构建后源代码没有额外变更。GitNexus 不可用时的 detect_changes 已执行；暂存模式返回空集，已明确以真实 staged diff 审核为准（不是“无影响”）。过程降级另存本地忽略文件 `.codex/operations-log.md`。
 - Trellis 保持待用户验收，不提前归档。重点测试：选择有 profile 的本机 Codex 终端 → `/hooks` 检查/确认 → 可见窗口最多约 10 秒刷新 → 关闭并重建同一供应商终端，确认不会因覆盖再次要求审核；切换终端后路径和灯色不串用。
+
+## 2026-10-15 第二轮：目录信任与按钮回归
+
+- 用户确认追加本任务，沿用 1.4.3，先提交后 NSIS，不推送。
+- 根因与发现清单见 design.md 追加章节；本章节替代上轮“只保留 hooks.state”和“待审核点击进入设置”的交付行为。
+- Rust provider:: 202/202 通过（新增三项：真实 runtime 三次重建及不同 profile 隔离、内联表精确路径与拒绝决定、非法旧记录不覆盖）。另外 hook_settings:: 44/44、project_policy::tests 17/17、codex_app_server_proxy::tests 29/29 通过；Rust 合计 292 项通过。
+- Node codexProfileHookTrust 9/9 通过：真实侧边栏待审核点击依次调用卸载、安装、刷新，不打开设置；完整安装仍只打开设置。IPC 与 React 环境采用测试替身，没有实际安装/卸载用户 Hook。
+- npx tsc --noEmit、独立 check:architecture -- --strict、git diff --check 通过；1313 个源码文件，0 超限、0 违规。
+- moderate 索引已更新至 44057 节点、118354 边；抽查 preserve_project_trust 确实被 profile_with_saved_state 调用。detect_changes 返回预期 9 个变更文件但 impacted_symbols 为空，因此以源码调用及真实 git diff 复核为准。
+- 未运行安装版 GUI、新旧语言切换、WSL/SSH 或实际 Codex 信任交互；不读取/改写用户密钥、不修改真实配置和信任、不关闭用户终端。
+- 同名 profile 中原先已被旧包抹掉的决定仍需用户确认一次；新独立项目扩展 profile、不曾信任的目录不自动授权。现有写前字节检查不保证跨进程 CAS。

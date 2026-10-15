@@ -15,7 +15,60 @@ fn read_profile(path: &Path) -> Result<Option<Vec<u8>>, String> {
     }
 }
 
-// 供应商不能提供信任；仅原样保留同一文件已有的 hooks.state，包括禁用和过期记录。
+// 项目信任来自同名文件中用户已保存的决定，不能由供应商输入或其他 profile 授予。
+fn preserve_project_trust(
+    document: &mut DocumentMut,
+    previous: Option<&DocumentMut>,
+) -> Result<(), String> {
+    if let Some(projects) = document.get_mut("projects") {
+        for (_, project) in projects
+            .as_table_like_mut()
+            .ok_or("codex_profile_invalid_projects")?
+            .iter_mut()
+        {
+            project
+                .as_table_like_mut()
+                .ok_or("codex_profile_invalid_project")?
+                .remove("trust_level");
+        }
+    }
+    let Some(projects) = previous.and_then(|doc| doc.get("projects")) else {
+        return Ok(());
+    };
+    for (path, project) in projects
+        .as_table_like()
+        .ok_or("codex_profile_existing_invalid_projects")?
+        .iter()
+    {
+        let project = project
+            .as_table_like()
+            .ok_or("codex_profile_existing_invalid_project")?;
+        let Some(trust) = project.get("trust_level") else {
+            continue;
+        };
+        if !matches!(trust.as_str(), Some("trusted" | "untrusted")) {
+            return Err("codex_profile_existing_invalid_project_trust".to_string());
+        }
+        if document.get("projects").is_none() {
+            document.insert("projects", Item::Table(Table::new()));
+        }
+        let target = document
+            .get_mut("projects")
+            .and_then(Item::as_table_like_mut)
+            .ok_or("codex_profile_invalid_projects")?;
+        if target.get(path).is_none() {
+            target.insert(path, Item::Table(Table::new()));
+        }
+        target
+            .get_mut(path)
+            .and_then(Item::as_table_like_mut)
+            .ok_or("codex_profile_invalid_project")?
+            .insert("trust_level", trust.clone());
+    }
+    Ok(())
+}
+
+// 保留同名文件的 Hook 和目录信任；生成配置仍负责其他供应商选项。
 fn profile_with_saved_state(generated: &str, previous: Option<&[u8]>) -> Result<Vec<u8>, String> {
     let mut document = generated
         .parse::<DocumentMut>()
@@ -26,11 +79,15 @@ fn profile_with_saved_state(generated: &str, previous: Option<&[u8]>) -> Result<
             .ok_or("codex_profile_invalid_hooks")?
             .remove("state");
     }
+    let previous = previous
+        .map(|previous| {
+            let text = std::str::from_utf8(previous).map_err(|_| "codex_profile_invalid_utf8")?;
+            text.parse::<DocumentMut>()
+                .map_err(|err| format!("codex_profile_existing_invalid: {err}"))
+        })
+        .transpose()?;
+    preserve_project_trust(&mut document, previous.as_ref())?;
     if let Some(previous) = previous {
-        let text = std::str::from_utf8(previous).map_err(|_| "codex_profile_invalid_utf8")?;
-        let previous = text
-            .parse::<DocumentMut>()
-            .map_err(|err| format!("codex_profile_existing_invalid: {err}"))?;
         if let Some(state) = previous.get("hooks").and_then(|hooks| hooks.get("state")) {
             if state.as_table_like().is_none() {
                 return Err("codex_profile_existing_invalid_state".to_string());
@@ -89,6 +146,100 @@ pub(crate) fn write_preserving_hook_state(path: &Path, generated: &str) -> Resul
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn repeated_runtime_launch_preserves_project_decisions_without_importing_supplier_trust() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("managed.config.toml");
+        fs::write(
+            &path,
+            r#"
+model = 'old'
+[projects.'f:\gitrepository\cli-manager']
+trust_level = 'trusted'
+old_option = 42
+[projects.'F:\worktree']
+trust_level = 'untrusted'
+[hooks.state.saved]
+trusted_hash = 'confirmed'
+"#,
+        )
+        .unwrap();
+        let profile = crate::provider::runtime::CodexProviderProfile {
+            profile_name: "managed".into(),
+            model_provider: "provider".into(),
+            profile_text: r#"
+model = 'new'
+[projects.'f:\gitrepository\cli-manager']
+custom = 7
+[projects.'F:\worktree']
+trust_level = 'trusted'
+[projects.foreign]
+trust_level = 'trusted'
+"#
+            .into(),
+        };
+        for _ in 0..3 {
+            crate::provider::runtime::write_codex_profile_to_dir(dir.path(), &profile).unwrap();
+            let actual: toml::Value = toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+            assert_eq!(actual["model"].as_str(), Some("new"));
+            let trusted = &actual["projects"][r"f:\gitrepository\cli-manager"];
+            assert_eq!(trusted["trust_level"].as_str(), Some("trusted"));
+            assert_eq!(trusted["custom"].as_integer(), Some(7));
+            assert!(trusted.get("old_option").is_none());
+            assert_eq!(
+                actual["projects"][r"F:\worktree"]["trust_level"].as_str(),
+                Some("untrusted")
+            );
+            assert!(actual["projects"]["foreign"].get("trust_level").is_none());
+            assert_eq!(
+                actual["hooks"]["state"]["saved"]["trusted_hash"].as_str(),
+                Some("confirmed")
+            );
+        }
+        let second = dir.path().join("other.config.toml");
+        write_preserving_hook_state(&second, &profile.profile_text).unwrap();
+        let actual: toml::Value = toml::from_str(&fs::read_to_string(second).unwrap()).unwrap();
+        for project in actual["projects"].as_table().unwrap().values() {
+            assert!(project.get("trust_level").is_none());
+        }
+    }
+
+    #[test]
+    fn inline_project_tables_preserve_only_exact_saved_trust_keys() {
+        let previous = br#"projects = { 'C:\repo' = { trust_level = 'untrusted', old = 1 } }"#;
+        let bytes = profile_with_saved_state(
+            r#"projects = { 'C:\repo' = { trust_level = 'trusted', fresh = 2 }, 'c:\repo' = { trust_level = 'trusted' } }"#,
+            Some(previous),
+        ).unwrap();
+        let actual: toml::Value = toml::from_str(std::str::from_utf8(&bytes).unwrap()).unwrap();
+        assert_eq!(
+            actual["projects"][r"C:\repo"]["trust_level"].as_str(),
+            Some("untrusted")
+        );
+        assert_eq!(
+            actual["projects"][r"C:\repo"]["fresh"].as_integer(),
+            Some(2)
+        );
+        assert!(actual["projects"][r"C:\repo"].get("old").is_none());
+        assert!(actual["projects"][r"c:\repo"].get("trust_level").is_none());
+    }
+
+    #[test]
+    fn invalid_project_decisions_never_overwrite_the_profile() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("managed.config.toml");
+        for old in [
+            "projects=1",
+            "[projects]\nrepo=1",
+            "[projects.repo]\ntrust_level='typo'",
+            "[projects.repo]\ntrust_level=true",
+        ] {
+            fs::write(&path, old).unwrap();
+            assert!(write_preserving_hook_state(&path, "model='new'").is_err());
+            assert_eq!(fs::read_to_string(&path).unwrap(), old);
+        }
+    }
 
     // 远程托管的真实入口必须与普通启动共用状态保留写入，不只是测试私有合并函数。
 

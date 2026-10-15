@@ -153,7 +153,7 @@ test("pending review requires installed definitions; both real UI entries use sc
     assert.doesNotMatch(code, /invoke<HookSettingsStatus>/);
     assert.match(code, /invokeStatus\("hook_settings_get_status"/);
   }
-  assert.match(source("src/features/projects/components/SidebarFooter.tsx"), /lightStatus === "installed" \|\| pendingReview/);
+  assert.doesNotMatch(source("src/features/projects/components/SidebarFooter.tsx"), /lightStatus === "installed" \|\| pendingReview/);
   assert.match(source("src/features/settings/components/HookSettingsPage.tsx"), /<CodexHookScopeStatus status=\{codex\}/);
   assert.match(source("src-tauri/src/features/providers/service/scope.rs"), /codex_profile::write_preserving_hook_state/);
   const backend = source("src-tauri/src/features/hooks/settings/mod.rs");
@@ -162,7 +162,7 @@ test("pending review requires installed definitions; both real UI entries use sc
 });
 
 
-test("real sidebar pending click opens settings instead of reinstalling, with actual profile context", async () => {
+test("real sidebar pending click reinstalls hooks with actual profile context", async () => {
   const calls = [], opened = [], contexts = [];
   const missing = { configDir: null, status: "directoryMissing" };
   const value = { claude: missing, kimi: missing, pi: missing, grok: missing,
@@ -174,16 +174,22 @@ test("real sidebar pending click opens settings instead of reinstalling, with ac
     useEffect: fn => fn(), useI18n: () => ({ t: key => key }),
     useSettingsStore: selector => selector(settings), useActiveCodexHookProfile: () => "managed",
     useHookStatusRequest: context => { contexts.push(context); return { status: value, invokeStatus: async (cmd, args) => { calls.push({ cmd, args }); return value; } }; },
-    codexHookNeedsReview, toast: {},
+    codexHookNeedsReview, toast: { success: () => {}, error: error => assert.fail(error) },
   }, ["HookStatusLight"]);
   const button = ui.HookStatusLight({ onOpenSettings: tab => opened.push(tab) });
   assert.equal(contexts[0].codexProfileName, "managed");
   assert.equal(button.props["data-hook-status"], "partial");
   assert.match(button.props.title, /managed.config.toml/);
   button.props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(opened, []);
+  assert.deepEqual(calls.map(call => call.cmd), ["hook_settings_get_status",
+    "hook_settings_uninstall_codex", "hook_settings_install_codex", "hook_settings_get_status"]);
+  value.codex = { ...value.codex, status: "installed", hooksTrusted: true };
+  calls.length = 0;
+  ui.HookStatusLight({ onOpenSettings: tab => opened.push(tab) }).props.onClick();
   assert.deepEqual(opened, ["hooks"]);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].cmd, "hook_settings_get_status");
+  assert.deepEqual(calls.map(call => call.cmd), ["hook_settings_get_status"]);
 });
 
 test("old directory callback cannot initiate mutation after changing scope", async () => {

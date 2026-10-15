@@ -21,11 +21,11 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "实现、定向回归、严格架构和 1.4.3 NSIS 已交付；待用户安装后验收，不归档、不推送。另有一条与本轮无关的既有 Kimi 源码正则断言失败，详见 verification.md。",
+  "notes": "用户追加目录信任保留和 Hook 按钮回归修复，沿用 1.4.3；完成后先提交再 NSIS，不推送。",
   "meta": {
     "installerVersion": "1.4.3",
     "relatedTask": "10-08-codex-provider-config-propagation",
-    "deliveryState": "awaiting_user_verification",
+    "deliveryState": "implementing_verification_followup",
     "installerSha256": "9A656E2A09D47F451E58A18351B93D5F275B9003AAD67989DAEB91DD688AE9B7",
     "installerBytes": 30202263,
     "installerBuiltAt": "2026-10-15T12:14:25+08:00"

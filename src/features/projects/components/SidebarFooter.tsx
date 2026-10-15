@@ -209,7 +209,7 @@ function HookStatusLight({ onOpenSettings }: { onOpenSettings: (tab?: SettingsTa
       onOpenSettings("hooks");
       return;
     }
-    if (lightStatus === "installed" || pendingReview) {
+    if (lightStatus === "installed") {
       onOpenSettings("hooks");
       return;
     }

@@ -21,3 +21,19 @@ GitNexus 未暴露，降级为契约、codebase-memory 和源码。影响图将 
 - 状态检查/变更返回/可见刷新/切终端竞态；中英文提示和路径。
 
 不启动应用或 Codex 推理，不操作真实 Hook 安装/信任或用户历史。自动化使用临时目录和真实函数；人工视觉、真实 WSL/SSH、安装验收明确留给用户。
+
+## 2026-10-15 验收反馈补全：目录信任与按钮
+
+根因：供应商启动重建 profile 的边界只保存 hooks.state，Codex 写回的 projects.<path>.trust_level 被丢弃；前端把 pendingReview 额外加入跳转设置分支，改变既有安装入口。
+
+用户同意追加当前任务、沿用 1.4.3，提交后 NSIS。当前分支干净且无上游，不进行同步。fast 是供应商 false 覆盖、状态栏重新应用已恢复，排除本轮。
+
+发现清单：
+- codex_profile::profile_with_saved_state：生成来源项目 trust 全部剥离，再仅合并同名旧文件的精确路径决定，保留 trusted/untrusted、其他生成选项，不复活旧模型或扩展参数。
+- scope::write_codex_profile / runtime::write_codex_profile_to_dir：共用上述写入，无需更改调用；真实 runtime 临时目录测试覆盖三次重建与另一供应商隔离。
+- SidebarFooter::HookStatusLight：去掉 pendingReview 跳转，重装仍经原有受上下文保护的请求；绿色保持打开设置。
+- 全局 Home、供应商数据库、状态栏、fast、PTY、Web/SSH/WSL、project-policy 独立快照生命周期：不修改，不导入其他环境/目录信任，不对新独立 profile 承诺免确认。
+
+场景：同名重复启动/恢复新进程/切走再切回保留决定；新供应商没有被自动授权；多个目录、拒绝信任、内联表、大小写不同路径不扩大授权；损坏记录拒绝覆盖；Hook 哈希和禁用决定继续保留。窗口焦点/分屏不参与文件保留判断；并发仍采用既有写前字节检查，不宣称跨进程 CAS。
+
+GitNexus 未暴露，使用 codebase-memory 调用图与真实源码复核；图把直接调用标 CRITICAL 且漏普通 scope/runtime 跨模块边，已提示风险。实际范围通过 rg、真实入口测试和 diff 确认。
