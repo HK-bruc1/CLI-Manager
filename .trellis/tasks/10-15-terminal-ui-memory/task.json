@@ -15,7 +15,7 @@
   "branch": "fix/terminal-ui-memory",
   "base_branch": "fix/history-index-memory",
   "worktree_path": null,
-  "commit": null,
+  "commit": "57c54e7185542a6c6971c8439707979cb40f1ff1",
   "pr_url": null,
   "subtasks": [],
   "children": [],
@@ -33,7 +33,9 @@
   "notes": "",
   "meta": {
     "version": "1.4.3",
-    "deliveryState": "validated_awaiting_build",
-    "push": false
+    "deliveryState": "awaiting_user_verification",
+    "push": false,
+    "installer": "src-tauri/target/local/release/bundle/nsis/CLI-Manager_1.4.3_x64-setup.exe",
+    "installerSha256": "1C22206B38E4FA3520A792ABE4B9DFC9144BB4A0468F9FC6778E3907E5E4A083"
   }
 }

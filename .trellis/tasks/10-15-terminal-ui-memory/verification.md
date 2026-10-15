@@ -16,3 +16,13 @@
 - 先提交再构建 1.4.3 NSIS；不推送、不自动安装。构建结果后补。
 
 - 实施后 memory 索引刷新为 44252 节点 / 117894 边，抽查 serializeTerminalAfterWrite 已接入调用。detect_changes 全工作区列出 10 个已跟踪文件但符号为空，staged 模式错误返回空；因此以 git diff --cached 逐项复核 16 个实际文件（含新增测试/任务），不把工具空结果当作无影响。
+
+## NSIS 交付
+- 源码提交：57c54e7185542a6c6971c8439707979cb40f1ff1；提交后工作区干净再构建，构建结束无源码变化。
+- npm run tauri:build:local -- --bundles nsis 退出 0。桌面/Web 生产构建通过，Rust 复用 local release 缓存，耗时 1m36s；仅 NSIS，不安装、不推送。
+- 安装包：F:/gitRepository/CLI-Manager/src-tauri/target/local/release/bundle/nsis/CLI-Manager_1.4.3_x64-setup.exe
+- 生成时间：2026-10-15 16:59:14 +08:00；30,182,626 字节；主程序 FileVersion / ProductVersion 均为 1.4.3。
+- SHA256：1C22206B38E4FA3520A792ABE4B9DFC9144BB4A0468F9FC6778E3907E5E4A083。
+- 上一轮包保留同目录 CLI-Manager_1.4.3_x64-setup.before-ui-memory-20261015-165306.exe。
+- 仅既有 chunk/导入、bundle identifier、Windows 链接器提示。未启动热部署服务，不需关闭用户进程。
+- 用户验收：退出旧版并安装后，以相同终端数量运行至少 5 分钟，覆盖回答预览开关、标签切换、持续输出与正常退出恢复；分别观察 CLI-Manager 和所属 WebView2。任务保持待用户验收，不归档。
