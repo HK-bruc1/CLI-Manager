@@ -1,0 +1,32 @@
+# Codex profile Hook 信任修复验证
+
+## 基线与根因
+
+- `master a9ea11c9` 与本地记录的 `origin/master` 同步；本轮从该提交开 `fix/codex-profile-hook-trust`，未 fetch/pull/merge/push。用户确认新任务关联 `10-08-codex-provider-config-propagation`，沿用 1.4.3，仅 NSIS。
+- 只读证据：Codex 0.162.1 的 `--profile` 叠加 `<name>.config.toml`；全局有八项有效确认、提问 Hook 的旧 matcher 哈希过期，两个供应商 profile 各保存了新确认。生成入口重写同名文件丢失决定，检测入口仅查全局。
+- 官方语义：https://learn.chatgpt.com/docs/hooks ：非托管 Hook 按当前定义的精确哈希审核，不绕过 `/hooks` 的用户确认。
+
+## 交付与发现清单
+
+- [x] 普通 scope 启动与远程 cc-connect runtime 的 profile 写入接入 `codex_profile::write_preserving_hook_state`；只保存同名已有 `hooks.state`。新配置中的信任剥离；不同 profile/全局隔离，损坏和替换前外部修改拒绝覆盖。
+- [x] 11 个聚合查询/安装/卸载命令接受可选 profile，上下文一致；`codex_status` 合并全局与指定 profile 后检测特性和精确信任，缺失/非法 profile 不回退为全局成功。新增 `effectiveConfigPath`、`hooksTrusted`，不改变旧状态枚举与公共配置同步的实际配置来源。
+- [x] 当前本机终端真实命令优先于供应商 fallback，覆盖 resume/短参数/引号/项目组合 profile。WSL/SSH/transcript 不借用宿主 profile。设置与侧边栏共用请求守卫，旧成功/错误不覆盖新上下文，失败清除旧绿色。
+- [x] 待审核解释和有效路径、检查错误均有中英文；待审核点击进入设置。可见窗口每 10 秒只读检查待审核状态，隐藏/请求进行中不检查，完成后停轮询；焦点/可见变化也只读刷新。
+- [x] ConfirmDialog、PTY/daemon、模型请求、历史删除、数据库结构与项目快照生命周期确认无关，未改动。设置大组件只搬出已有声音错误映射以满足 2000 行限制，不改变声音行为。
+
+## 已执行
+
+- Rust `provider::`：199 通过（包括 5 项写入/真实 runtime 入口测试）。
+- Rust `hook_settings::`：44 通过（包括 5 项有效配置/临时真实九项哈希与再生成集成测试）。
+- Rust `project_policy::tests`：17 通过；`codex_app_server_proxy::tests`：29 通过。
+- Node 定向回归：77 通过，涵盖新 9 项 profile/请求/可见刷新/实际侧边栏回调/双语测试，以及启动隔离、恢复参数、供应商、Hook 归属和异步提问回归。IPC、React 调度/事件、设置等外部依赖为模拟；没有启动桌面应用或实际审核用户 Hook。
+- 加入既有 `kimiHookFrontend.test.mjs` 的扩展回归为 80/81：一条旧源码正则断言要求 `event.payload.source`，实际基线已使用 `payload.source`（App.tsx:962），同文件仍有 Kimi 防护。测试及所读 App/terminalStatus/hookErrors 与 HEAD 均无差异，本轮不为通过检查改无关业务或测试。定向 77 项独立全绿。
+- `npx tsc --noEmit` 与独立 `npm run check:architecture -- --strict`、`git diff --check` 通过；严格架构 1313 个源码文件、0 超限、0 新违规。
+- GitNexus 工具未暴露，依契约降级至 codebase-memory 与真实源码。分支后和实现后 moderate 索引已刷新，44,033 节点/118,287 边；抽查有效状态入口源码与两处 UI 调用。图对 `super::codex_profile` 调用漏边，以源码、真实 runtime 测试和跨层临时 Home 集成复核；detect_changes 只作辅助，不声称完整覆盖新文件。
+
+## 限制与验收
+
+- 尚未运行安装后的真实窗口/中英文切换或 WSL/SSH 环境验收，未安装、重启用户程序、修改真实配置/Hook/信任，也未调用供应商模型。用户安装后需验证当前供应商终端 `/hooks`，再关闭并新建同一供应商终端，检查决定保留和灯色。
+- 如果旧版本已抹掉确认，需要在 Codex 中再确认一次；新独立项目 profile、定义变更或显式禁用仍由 Codex 审核，不承诺全部自动绿色。
+- 写入检测到外部变化会失败以保护用户决定；最后字节检查与 rename 之间仍有极短跨进程竞态，不宣称 CAS。新包不可修复用户手动删除/损坏的 profile，错误会显式报告。
+- 构建/安装包证据待下节补充：先本地提交，再使用缓存执行 `npm run tauri:build:local -- --bundles nsis`，保留旧包、不安装、不推送。

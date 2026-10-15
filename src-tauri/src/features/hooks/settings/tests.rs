@@ -5,6 +5,9 @@ use super::pi::pi_extension_path;
 use super::*;
 use tempfile::TempDir;
 
+#[path = "profile_tests.rs"]
+mod profile_tests;
+
 #[test]
 // 兼容公共同步不能凭计算哈希自动信任，只复制真实确认且保留禁用状态。
 fn codex_common_sync_copies_only_current_saved_trust() {
