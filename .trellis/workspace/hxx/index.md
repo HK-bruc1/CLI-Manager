@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 132
-- **Last Active**: 2026-10-12
+- **Total Sessions**: 133
+- **Last Active**: 2026-10-13
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~93 | Active |
+| `journal-3.md` | ~114 | Active |
 | `journal-2.md` | ~1975 | Archived |
 | `journal-1.md` | ~2014 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 133 | 2026-10-13 | 终端布局锁定与验收修正（#278） | `8d500f01` | `master` |
 | 132 | 2026-10-12 | 修复 Esc 焦点边框与远程连接设置退出 | 同本提交 | `master` |
 | 131 | 2026-10-09 | 修复 Codex Hook 串终端与实时统计 | `d1c0689e` | `master` |
 | 130 | 2026-10-08 | V1.4.2 历史删除补齐与编译告警清理 | `14e9de2e`, `70ea97ea` | `master` |
