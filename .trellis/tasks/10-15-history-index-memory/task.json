@@ -1,0 +1,28 @@
+{
+  "id": "history-index-memory",
+  "name": "history-index-memory",
+  "title": "历史索引内存优化",
+  "description": "消除历史索引统计深拷贝与整份 JSON 临时缓冲，请求日志先筛选再逐文件物化，保留数据与终端设置。",
+  "status": "in_progress",
+  "dev_type": "backend",
+  "scope": "history",
+  "package": null,
+  "priority": "P2",
+  "creator": "codex",
+  "assignee": "codex",
+  "createdAt": "2026-10-15",
+  "completedAt": null,
+  "branch": "fix/history-index-memory",
+  "base_branch": "master",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "用户同意新任务、沿用 1.4.3；验证后提交再构建 NSIS，不推送。",
+  "meta": {
+    "installerVersion": "1.4.3"
+  }
+}
