@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 134
+- **Total Sessions**: 135
 - **Last Active**: 2026-10-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~135 | Active |
+| `journal-3.md` | ~160 | Active |
 | `journal-2.md` | ~1975 | Archived |
 | `journal-1.md` | ~2014 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 135 | 2026-10-16 | PR #284 多行启动命令 P2 修复 | `900deab0` | `pr-284-review-fixes` |
 | 134 | 2026-10-16 | Pi Hook 运行结束边界修复验收与提交 | `3d323958` | `master` |
 | 133 | 2026-10-13 | 终端布局锁定与验收修正（#278） | `8d500f01` | `master` |
 | 132 | 2026-10-12 | 修复 Esc 焦点边框与远程连接设置退出 | 同本提交 | `master` |

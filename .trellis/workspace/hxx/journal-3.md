@@ -133,3 +133,28 @@ V1.4.4：隔离根 Pi 与子实例，按运行代际拦截重复和过期完成�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 135: PR #284 多行启动命令 P2 修复
+
+**Date**: 2026-10-16
+**Task**: PR #284 多行启动命令 P2 修复
+**Branch**: `pr-284-review-fixes`
+
+### Summary
+
+修复字面转义误删、SSH 多行启动绕过和 Codex VM 缺失依赖；更新 V1.4.4 记录及契约。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `900deab0` | (see git log) |
+
+### Testing
+
+- [OK] 78/78 定向回归；TypeScript、普通/严格架构、交互式 Git Bash 与 diff check 通过。
+
+### Status
+
+[OK] **Completed**
