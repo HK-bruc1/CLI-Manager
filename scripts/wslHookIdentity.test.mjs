@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import { createRequire } from "node:module";
 
 // 执行实际受管插件源码，隔离 process/fetch，避免触碰用户环境或发送网络请求。
 function loadPlugin(source, distro) {
@@ -13,7 +14,9 @@ function loadPlugin(source, distro) {
   }).outputText;
   runInNewContext(code, {
     exports,
+    require: createRequire(import.meta.url),
     process: {
+      pid: 100,
       env: {
         CLI_MANAGER_TAB_ID: "wsl-tab",
         CLI_MANAGER_NOTIFY_PORT: "12345",
@@ -31,15 +34,10 @@ function loadPlugin(source, distro) {
   return { exports, payloads };
 }
 
-// 展开 Rust format! 的受管 Pi 模板；全部生命周期模块启用，类型导入由 TS 擦除。
+// 与 Rust include_str! 使用同一模板，全部模块启用，类型导入由 TS 擦除。
 function piSource() {
-  const rust = readFileSync(new URL("../src-tauri/src/features/hooks/settings/pi.rs", import.meta.url), "utf8");
-  const template = rust.match(/r#"(\/\/ \{marker\}[\s\S]*?)"#,/);
-  assert.ok(template, "Pi managed template must remain discoverable");
-  return template[1]
-    .replaceAll("{marker}", "__CLI_MANAGER_PI_TEST__")
-    .replace(/\{(?:session_start|running|stop)\}/g, "true")
-    .replaceAll("{{", "{").replaceAll("}}", "}");
+  return readFileSync(new URL("../src-tauri/src/features/hooks/settings/pi_extension.ts", import.meta.url), "utf8")
+    .replaceAll("__SESSION_START__", "true").replaceAll("__RUNNING__", "true").replaceAll("__STOP__", "true");
 }
 
 const opencodeSource = readFileSync(new URL("../src-tauri/resources/opencode/cli-manager-hook.js", import.meta.url), "utf8");
@@ -55,9 +53,11 @@ for (const [label, distro, expected] of [
     const handlers = new Map();
     exports.default({ on: (event, callback) => handlers.set(event, callback) });
     for (const event of ["session_start", "agent_start", "agent_settled"]) {
-      handlers.get(event)({}, { sessionManager: { getSessionId: () => "pi-session" } });
+      handlers.get(event)({}, {
+        sessionManager: { getSessionId: () => "pi-session" }, isIdle: () => true, hasPendingMessages: () => false,
+      });
     }
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 15));
     assert.deepEqual(payloads.map((p) => p.event), ["SessionStart", "UserPromptSubmit", "Stop"]);
     for (const payload of payloads) {
       assert.equal(payload.wslDistroName, expected);

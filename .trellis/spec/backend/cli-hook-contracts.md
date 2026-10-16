@@ -994,10 +994,13 @@ hook_settings_uninstall_pi({ selectedDir, codexSelectedDir, piSelectedDir, ccSwi
 
 Pi extension path: ~/.pi/agent/extensions/cli-manager-hook.ts
 Pi source: pi
-Pi events: SessionStart | UserPromptSubmit | Stop
+Pi events: SessionStart | UserPromptSubmit | Stop | Interrupt | StopFailure
 Stable conflict error: pi_extension_conflict
-Generated lifecycle reporter: postHookEvent(event, sessionId) -> Promise<void>
+Generated lifecycle reporter: postHookEvent(event) -> Promise<void>
 Generated reporter deadline: HOOK_TIMEOUT_MS = 1_000
+Root owner environment: CLI_MANAGER_PI_OWNER = JSON({ tabId, pid })
+Modern Pi HTTP metadata: pi = { instanceId, instanceStartedAt, sequence, runId }
+HTTP deduplication: remoteEventId = `${instanceId}:${sequence}`, remoteSequence = sequence
 ```
 
 ### 3. Contracts
@@ -1007,7 +1010,15 @@ Generated reporter deadline: HOOK_TIMEOUT_MS = 1_000
 - Uninstall may remove only a marker-owned file.
 - Required Pi modules are session start, running, stop, and the built-in Extension loading mechanism. Pi has no attention, failure, or sub-agent module requirement.
 - Full Pi installation reports `installed`; any non-empty strict subset reports `partialInstalled`; no modules reports `notInstalled`.
-- `session_start` maps to one `SessionStart`, `agent_start` maps to one `UserPromptSubmit`, and `agent_settled` maps to one `Stop`. Do not also map `before_agent_start` to `UserPromptSubmit`, because one Pi run emits both lifecycle events.
+- `session_start` binds the root session. `before_agent_start` tracks a new session-level run locally; `agent_start` reports `UserPromptSubmit` at most once per such run. Never send running from both events. Internal retries/compaction may emit multiple low-level starts.
+- `agent_settled` reports the final current-run result: `aborted` takes precedence as `Interrupt`, the latest completed assistant error maps to `StopFailure`, otherwise `Stop` means only "run ended". Intermediate failures must be replaced by a successful retry result; never send final failure from `agent_end`.
+- The extension template lives in `settings/pi_extension.ts` and is included by Rust with explicit module-placeholder replacement. Lifecycle/identity listeners remain enabled in stop-only installations; module switches control outward reports, not ownership tracking.
+- The root extension reserves a process-local lease at factory initialization, before `session_start`, and writes `CLI_MANAGER_PI_OWNER` for child inheritance. A different inherited PID for the same Tab or an already-owned same-process SDK runtime cannot report. The owner marker is not an authentication credential. `new`/`resume`/`fork` keep the lease; `reload`/`quit` release it. Instance identity and sequence survive reload within that process.
+- Completion candidates are dispatched asynchronously and invalidated by observed new runs, session changes or shutdown; `isIdle`/pending-message checks are supplementary. Pi 1.2.0 can defer new requests from settle handlers until after dispatch; no fixed delay or idle check proves an arbitrary third-party workflow has finished. Do not use private Pi fields or call command-only `waitForIdle` from lifecycle handlers.
+- Before every HTTP sink side effect, `PiHookAdmission` validates monotonic instance/run/sequence, same-run session identity and one terminal event per run. Hold the admission lock through Pi sink delivery so concurrently accepted requests cannot be delivered in reverse order. The bounded cache stores at most 1024 Tabs and evicts the oldest accepted timestamp.
+- Modern metadata is optional for wire compatibility. Legacy no-metadata Pi requests are admitted only for Tabs not yet claimed by modern Pi metadata. A newer root instance may replace an older one; retired instances cannot reclaim it while retained. Bridge restart/cache eviction resets retained admission history. Other CLI event semantics do not change.
+- Shared `pi-hook.json` translations provide Pi run-ended text to frontend and third-party formatting. Third-party explicit `en-US`/`zh-CN`/`zh-TW` uses saved settings; `auto` retains its existing Chinese default. `Interrupt` is state cleanup only and must not create taskbar/system/toast/third-party completion notifications.
+- Existing installed or running extensions require explicit Pi Hook reinstall and reload/restart to use the new producer. Updating only the application does not establish the new producer's identity guarantees. Native SSH Agent Hook installation currently supports Claude/Codex/Kimi, not Pi.
 - The extension reads `CLI_MANAGER_TAB_ID`, `CLI_MANAGER_NOTIFY_PORT`, and `CLI_MANAGER_NOTIFY_TOKEN` from its PTY environment and silently skips reporting if any are missing.
 - Pi lifecycle handlers must detach bridge delivery with `void postHookEvent(...)`; they must never `await` a loopback HTTP request, because Pi awaits extension handlers before continuing the agent lifecycle.
 - `postHookEvent` is best-effort and owns a bounded `AbortController` timeout of `HOOK_TIMEOUT_MS`. Timeout, connection failure, or abort is swallowed after cleanup and cannot delay terminal input, agent start, or settle.
@@ -1025,6 +1036,11 @@ Generated reporter deadline: HOOK_TIMEOUT_MS = 1_000
 | Hook callback environment is incomplete | Extension returns without throwing or interrupting Pi. |
 | Loopback bridge is slow, unreachable, or times out | Return from the Pi event handler immediately; abort the detached request within `HOOK_TIMEOUT_MS` and swallow its failure. |
 | Full three-module install | Return `installed`, allowing PTY callback environment injection. |
+| Child process inherits parent owner / same-process SDK child starts first | No top-level Hook requests; do not bind child session to parent Tab. |
+| Duplicate terminal event / old sequence / older run / retired instance | Respond 204 without invoking any sink. |
+| Malformed modern Pi metadata / metadata on another source | Respond 400; do not deliver. |
+| Escape or abort / final error / error followed by successful retry | Interrupt / StopFailure / Stop respectively; no premature success or failure. |
+| Session switch / reload / stop-only installation | Keep valid root binding and monotonic delivery; do not permanently mute later runs. |
 
 ### 5. Good/Base/Bad Cases
 
@@ -1043,12 +1059,16 @@ Generated reporter deadline: HOOK_TIMEOUT_MS = 1_000
 
 ### 6. Tests Required
 
-- Rust: full install reports `HookInstallStatus::Installed`, contains `session_start`, `agent_start`, and `agent_settled`, and does not contain `before_agent_start`.
+- Rust: full install reports `HookInstallStatus::Installed`, contains the lifecycle listeners, and has exactly one outward `UserPromptSubmit` call despite local `before_agent_start` tracking.
 - Rust: one selected module reports `HookInstallStatus::PartialInstalled`.
 - Rust: install against an unowned same-name extension returns `pi_extension_conflict` and preserves exact content.
 - Rust: install then uninstall removes the marker-owned extension.
 - Rust: generated Pi extension source uses `void postHookEvent` for every lifecycle mapping, contains `AbortController` and `HOOK_TIMEOUT_MS = 1_000`, and contains no `await postHookEvent`.
 - TypeScript: type-check after frontend status or localized error handling changes.
+- Node: `piHookLifecycle.test.mjs` executes the generated template; cover nested process/SDK isolation including early SDK startup, duplicate/new runs, abort/failure/retry result, busy/pending work, reload/switch/stop-only, incomplete env and network timeout. `PI_HOOK_BASELINE=1` intentionally demonstrates failures against the old HEAD template before this fix.
+- Optional SDK integration: install `@earendil-works/pi-coding-agent@1.2.0` in an isolated directory and set `PI_SDK_DIR` for `piHookSdk.test.mjs`; no user config or real model requests. Verify tool cycles, retry, compaction, queued follow-up, before-settle continuation, deferred new runs and final result classification. Missing SDK is reported as skipped, never as an executed integration pass.
+- Rust: admission and real loopback HTTP tests verify that rejected requests cause zero sink calls, cancellation/failure pass the Pi whitelist, newer runs work and non-Pi/legacy compatibility remains. Third-party formatter tests verify shared run-ended text and silent Interrupt.
+- Frontend: `piHookNotification.test.mjs` executes App formatters in both languages; WSL identity and existing Kimi/OpenCode/Tab-binding regressions remain passing.
 - Manual: verify Hook settings in `zh-CN`, `zh-TW`, and `en-US`, then start one Pi run and confirm exactly one running transition.
 
 ### 7. Wrong vs Correct
@@ -1085,7 +1105,9 @@ pi.on("agent_start", reportRunning);
 
 ```typescript
 pi.on("agent_start", (_event, ctx) => {
-  void postHookEvent("UserPromptSubmit", readSessionId(ctx));
+  if (!owns(ctx) || runtime.reportedRunning) return;
+  runtime.reportedRunning = true;
+  void postHookEvent("UserPromptSubmit");
 });
 ```
 
