@@ -26,3 +26,5 @@
 ## 交付
 
 两份产品交付文档归入 V1.4.4。修复在独立 `pr-284-review-fixes` 工作区提交，推送目标为现有 PR #284 的来源分支，不合并 PR。
+
+修复提交：`900deab0`（`fix(terminal): preserve startup escapes and normalize SSH commands`）。
