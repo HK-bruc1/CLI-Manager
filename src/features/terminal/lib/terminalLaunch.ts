@@ -105,8 +105,10 @@ export function getCurrentTerminalColors() {
 
 // Codex 的共享 app-server 会保留首个 PTY 的 Hook 环境；自动启动必须使用独立服务。
 // --no-daemon 同时禁止复用已经运行的服务；手工输入仍由终端原样处理。
+// SSH bootstrap 绕过后续 PTY 格式化器，必须在共同的准备阶段先完成多行拼接。
 export function prepareStartupCommandForPty(command: string | undefined, shell: ShellKey | null): string | undefined {
-  const prepared = withCodexNoDaemon(command);
+  const singleLineCommand = command === undefined ? undefined : joinStartupCommandLines(command, shell);
+  const prepared = withCodexNoDaemon(singleLineCommand);
   if (!prepared || shell !== "gitbash" || !isCurrentTerminalBackgroundLight()) return prepared;
   return withCodexLightTuiTheme(prepared);
 }
@@ -199,8 +201,8 @@ export function buildDirectCodexLaunchCommand(command: string): string {
   return `\x0c${normalized}`;
 }
 
-// 启动命令写入 PTY 的唯一收口点：多行先按 Shell 语法拼成一条命令，否则换行会被 PTY 当回车逐行执行。
-// Codex 直启判定必须放在拼接之后，否则多行的 codex 命令识别不到直启前缀。
+// PTY 写入前再次规范化，兼容手动调用和旧会话延迟重放；已准备的单行命令不会重复修改。
+// SSH 由 prepareStartupCommandForPty 先规范化；这里只为本地 PTY 追加 Codex 清屏前缀和回车。
 export function formatStartupInputForPty(command: string, shell?: ShellKey | null): string {
   const singleLineCommand = joinStartupCommandLines(command, shell ?? null);
   if (!isDirectCodexStartupCommand(singleLineCommand)) return `${singleLineCommand}\r`;

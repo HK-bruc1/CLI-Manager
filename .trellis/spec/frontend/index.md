@@ -25,6 +25,7 @@ Read the domain contract that owns the code being changed; do not load every gui
 | [Type Safety](./type-safety.md) | Stable entry for type validation and owning contracts | Active |
 | [History Session Contracts](./history-session-contracts.md) | History favorites, metadata, and snapshot fallback contracts | Active |
 | [Workspace Session Restore Contracts](./workspace-session-restore-contracts.md) | 关闭后恢复工作区终端会话：TUI 走 resume、shell 贴 scrollback、节流落盘与启动问询 | Active |
+| [Startup Command Text Contracts](./startup-command-text-contracts.md) | 多行命令、转义/引号边界、本地与 SSH 共同准备及真实行为回归 | Active |
 | [Background Task Continuation Contracts](./background-task-continuation-contracts.md) | 运行任务退出守卫、daemon 后台继续、托盘最小化与通知边界 | Active |
 | [Terminal Output Scheduling Contracts](../backend/terminal-output-scheduling-contracts.md) | Daemon live-frame budget and frontend cross-terminal xterm scheduling contract | Active |
 | [Statusline Editor Contracts](./statusline-editor-contracts.md) | Claude/Codex 独立编辑状态、共享终端主题预览与响应式布局 | Active |

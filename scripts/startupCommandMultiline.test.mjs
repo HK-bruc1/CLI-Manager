@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import {
   joinStartupCommandLines,
   startupCommandContinuationChars,
@@ -39,10 +38,11 @@ test("continuation characters are mapped per shell", () => {
   assert.deepEqual(startupCommandContinuationChars("sh"), ["\\"]);
 });
 
-test("unknown shell strips every continuation character", () => {
+test("unknown shell recognises separate continuation markers conservatively", () => {
   assert.deepEqual(startupCommandContinuationChars(null), ["`", "^", "\\"]);
   assert.deepEqual(startupCommandContinuationChars(undefined), ["`", "^", "\\"]);
   assert.equal(joinStartupCommandLines("ssh `\n-L 1 ^\n-L 2 \\\nhost", undefined), "ssh -L 1 -L 2 host");
+  assert.equal(joinStartupCommandLines("tool\nC:\\", null), "tool C:\\");
 });
 
 test("real-world multi-line ssh command becomes a single valid command", () => {
@@ -83,13 +83,29 @@ test("documented limitation: Bash-family strips a trailing path backslash", () =
   assert.equal(joinStartupCommandLines("cd C:\\\nnpm run dev", "bash"), "cd C: npm run dev");
 });
 
-test("the PTY startup formatter joins multi-line commands before the Codex direct-launch check", () => {
-  const source = readFileSync(
-    new URL("../src/features/terminal/lib/terminalLaunch.ts", import.meta.url),
-    "utf8",
-  );
-  assert.match(source, /joinStartupCommandLines\(command, shell \?\? null\)/);
-  assert.match(source, /isDirectCodexStartupCommand\(singleLineCommand\)/);
+test("literal escape pairs survive while an odd trailing escape still continues", () => {
+  for (const [shell, marker] of [["bash", "\\"], ["wsl", "\\"], ["gitbash", "\\"], ["powershell", "`"], ["pwsh", "`"], ["cmd", "^"]]) {
+    for (const count of [2, 3, 4, 5]) {
+      const literal = `value${marker.repeat(count - count % 2)}`;
+      assert.equal(joinStartupCommandLines(`tool\nvalue${marker.repeat(count)}`, shell), `tool ${literal}`, `${shell}: ${count}`);
+    }
+  }
+});
+
+test("quoted literal markers are preserved across line boundaries", () => {
+  assert.equal(joinStartupCommandLines("tool 'value\\\nnext'", "bash"), "tool 'value\\ next'");
+  assert.equal(joinStartupCommandLines("tool 'value`\nnext'", "powershell"), "tool 'value` next'");
+  assert.equal(joinStartupCommandLines('tool "value^\nnext"', "cmd"), 'tool "value^ next"');
+  assert.equal(joinStartupCommandLines("tool 'it''s `\nnext'", "pwsh"), "tool 'it''s ` next'");
+  assert.equal(joinStartupCommandLines('tool "value \\\nnext"', "cmd"), 'tool "value \\ next"');
+});
+
+test("double quoted native continuations and standalone marker lines still join", () => {
+  assert.equal(joinStartupCommandLines('tool "value \\\nnext"', "bash"), 'tool "value next"');
+  assert.equal(joinStartupCommandLines('tool "value `\nnext"', "powershell"), 'tool "value next"');
+  for (const shell of ["cmd", "powershell", null]) {
+    assert.equal(joinStartupCommandLines("ssh\n\\\n-L 1\nhost", shell), "ssh -L 1 host");
+  }
 });
 
 test("regression: a CMD project accepts Bash-style backslash continuation", () => {
