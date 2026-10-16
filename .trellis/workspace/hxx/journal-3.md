@@ -112,3 +112,24 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 134: Pi Hook 运行结束边界修复验收与提交
+
+**Date**: 2026-10-16
+**Task**: Pi Hook 运行结束边界修复验收与提交
+**Branch**: `master`
+
+### Summary
+
+V1.4.4：隔离根 Pi 与子实例，按运行代际拦截重复和过期完成事件，区分正常结束、中断和失败。47 项 Node 测试、官方 Pi 1.2.0 SDK 9 场景、Rust 定向测试及类型/架构检查通过；2026-10-16 用户确认修复验证完成并授权提交，任务已归档。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3d323958` | (see git log) |
+
+### Status
+
+[OK] **Completed**
