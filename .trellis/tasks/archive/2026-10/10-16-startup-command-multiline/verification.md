@@ -35,6 +35,9 @@
 
 ## 提交和交付
 
-- 变更文件：`src/features/terminal/lib/startupCommandText.ts`（新增）、`src/features/terminal/lib/terminalLaunch.ts`、`src/features/projects/components/ConfigModal.tsx`、`src/shared/i18n/messages/projects.zh-CN.ts`、`src/shared/i18n/messages/projects.en-US.ts`、`scripts/startupCommandMultiline.test.mjs`（新增）。
+- 变更文件：`src/features/terminal/lib/startupCommandText.ts`（新增）、`src/features/terminal/lib/terminalLaunch.ts`、`src/features/projects/components/ConfigModal.tsx`、`src/shared/i18n/messages/projects.zh-CN.ts`、`src/shared/i18n/messages/projects.en-US.ts`、`scripts/startupCommandMultiline.test.mjs`（新增）、`CHANGELOG.md`、`docs/功能清单.md`，以及本任务目录。
 - 工作区另有与本任务无关的未跟踪文件（`.workbuddy/`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、`scripts/sidebarInformationArchitecture.test.mjs`、`.trellis/tasks/09-25-sidebar-information-architecture/`），不纳入本次提交。
-- 尚未提交、尚未推送；等待用户确认版本号与提交授权。
+- 版本归属：用户确认归入 `CHANGELOG.md` 的 `V1.4.4`。
+- 已提交：`2168b1e8`（`feat(projects): support multi-line terminal startup command`），13 个文件、+620 / −5。
+- 提交位置：分支 `feat/edit-terminal-startup-command`（基于 `f52b9bda`，即 `upstream/master`）。该分支为本地分支、无上游跟踪。
+- 未推送：用户明确要求只提交到当前分支，不 push。
