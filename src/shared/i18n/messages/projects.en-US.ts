@@ -191,6 +191,7 @@ export const en: Record<keyof typeof zh, string> = {
   "configModal.cliArgsHistoryCount": "Used {count} times",
   "configModal.shell": "Shell",
   "configModal.startupCommand": "Startup Command",
+  "configModal.startupCommandMultilineHint": "Multi-line supported. Line breaks and trailing continuation characters (PowerShell backtick / CMD ^ / Bash backslash) are joined into a single command before it runs.",
   "configModal.envVars": "Environment Variables (JSON)",
   "configModal.a11y.envVarsHelp": "View an environment-variable JSON format example",
   "configModal.envVarsHelp": "Enter a JSON object. Both keys and values must use double quotes.",

@@ -144,6 +144,7 @@ export function ConfigModal({ project, cloneFrom, defaultGroupId, onManageSshHos
   const shellFieldId = useId();
   const envVarsFieldId = useId();
   const envVarsHelpId = useId();
+  const startupCmdFieldId = useId();
   const worktreeDepsPromptFieldId = useId();
   const sshHostFieldId = useId();
   const remotePathFieldId = useId();
@@ -866,7 +867,14 @@ export function ConfigModal({ project, cloneFrom, defaultGroupId, onManageSshHos
               </div>}
 
               {cliTool.trim() === "" && (
-                <Field label={t("configModal.startupCommand")} value={startupCmd} onChange={setStartupCmd} placeholder="npm run dev" />
+                <FieldTextarea
+                  id={startupCmdFieldId}
+                  label={t("configModal.startupCommand")}
+                  value={startupCmd}
+                  onChange={setStartupCmd}
+                  placeholder="npm run dev"
+                  hint={t("configModal.startupCommandMultilineHint")}
+                />
               )}
               <div>
                 <div className="mb-1.5 flex items-center gap-1">
@@ -1661,6 +1669,50 @@ function Field({
         placeholder={placeholder}
         className="text-sm"
       />
+    </div>
+  );
+}
+
+// 多行字段：与 Field 同构，但底层用 Textarea 保留换行——HTML input 的 value 不允许换行，
+// 会把多行启动命令在进入 state 前就压成一行。hint 通过 aria-describedby 关联，供读屏读取拼接规则。
+function FieldTextarea({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  hint,
+  rows = 3,
+}: {
+  id?: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  hint?: string;
+  rows?: number;
+}) {
+  const hintId = useId();
+  return (
+    <div>
+      <label htmlFor={id} className="ui-config-form-label">
+        {label}
+      </label>
+      <Textarea
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        spellCheck={false}
+        aria-describedby={hint ? hintId : undefined}
+        className="min-h-20 resize-y font-mono text-sm leading-5"
+      />
+      {hint && (
+        <p id={hintId} className="mt-1 text-[11px] leading-relaxed text-text-muted">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

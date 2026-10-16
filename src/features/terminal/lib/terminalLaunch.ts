@@ -32,6 +32,7 @@ import {
   type OpenCodeHookStatusPayload, type DetachedPtyLaunchOptions,
   type DetachedPtyLaunchResult, type ProviderLaunchSnapshotResponse, type ResolvedPtyLaunch,
 } from "../types/terminalStoreTypes";
+import { joinStartupCommandLines } from "./startupCommandText";
 import { SHELL_RUNTIME_MONITORING_ENV } from "./terminalStatus";
 import {
   garbageCollectProjectExtensionSnapshots as garbageCollectProjectExtensionSnapshotsApi,
@@ -198,9 +199,12 @@ export function buildDirectCodexLaunchCommand(command: string): string {
   return `\x0c${normalized}`;
 }
 
-export function formatStartupInputForPty(command: string, _shell?: ShellKey | null): string {
-  if (!isDirectCodexStartupCommand(command)) return `${command}\r`;
-  return `${buildDirectCodexLaunchCommand(command)}\r`;
+// 启动命令写入 PTY 的唯一收口点：多行先按 Shell 语法拼成一条命令，否则换行会被 PTY 当回车逐行执行。
+// Codex 直启判定必须放在拼接之后，否则多行的 codex 命令识别不到直启前缀。
+export function formatStartupInputForPty(command: string, shell?: ShellKey | null): string {
+  const singleLineCommand = joinStartupCommandLines(command, shell ?? null);
+  if (!isDirectCodexStartupCommand(singleLineCommand)) return `${singleLineCommand}\r`;
+  return `${buildDirectCodexLaunchCommand(singleLineCommand)}\r`;
 }
 
 export function formatManualDirectCodexInputForPty(command: string, shell?: ShellKey | null): string {

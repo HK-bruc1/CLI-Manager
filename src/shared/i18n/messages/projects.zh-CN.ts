@@ -189,6 +189,7 @@ export const zh = {
   "configModal.cliArgsHistoryCount": "使用 {count} 次",
   "configModal.shell": "Shell",
   "configModal.startupCommand": "启动命令",
+  "configModal.startupCommandMultilineHint": "支持多行输入；换行与行尾续行符（PowerShell 反引号 / CMD ^ / Bash 反斜杠）会被拼接为同一条命令后执行。",
   "configModal.envVars": "环境变量（JSON）",
   "configModal.a11y.envVarsHelp": "查看环境变量 JSON 格式示例",
   "configModal.envVarsHelp": "请填写 JSON 对象，键和值均使用双引号。",
