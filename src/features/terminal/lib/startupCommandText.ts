@@ -23,12 +23,24 @@ export function startupCommandContinuationChars(shell?: ShellKey | null): string
   return shellChar ? [shellChar] : ALL_STARTUP_CONTINUATION_CHARS;
 }
 
+// 行尾续行符与前面的内容用空白分隔时，无论它属于哪个 Shell 都按续行处理。
+// 用户按自己的习惯书写续行（例如 CMD 项目里写 Bash 的反斜杠）时，若只认当前 Shell 的符号，
+// 续行符就会作为命令内容送进终端：ssh 会把它当成主机名的一部分，报 hostname contains invalid characters。
+function isSpacedContinuation(line: string): boolean {
+  if (!ALL_STARTUP_CONTINUATION_CHARS.includes(line.slice(-1))) return false;
+  return /\s/u.test(line.slice(-2, -1));
+}
+
 /**
  * 把多行启动命令按 Shell 语法拼接为同一条命令。
  *
  * 单行输入原样返回（含首尾空白），保证既有单行命令零回归。多行时逐行去掉行尾续行符、
  * 丢弃空行，再用单个空格拼接：PTY 只会收到一行内容加一个回车，不会把换行当回车逐行执行，
  * 因此 `ssh` 多组 `-L` 参数这类续行命令不会被拆断。
+ *
+ * 续行符判定有两条：当前 Shell 自己的符号无条件去除；别的 Shell 的符号与内容用空白分隔时
+ * 也去除。前者保证各 Shell 的续行语义正确，后者让跨 Shell 书写的续行可用；而 `cd C:\`
+ * 这类行尾反斜杠紧跟非空白字符，仍按字面保留。
  */
 export function joinStartupCommandLines(command: string, shell?: ShellKey | null): string {
   if (!/[\r\n]/u.test(command)) return command;
@@ -37,7 +49,9 @@ export function joinStartupCommandLines(command: string, shell?: ShellKey | null
   for (const rawLine of command.split(/\r\n|\r|\n/u)) {
     let line = rawLine.trim();
     if (!line) continue;
-    if (continuationChars.includes(line.slice(-1))) line = line.slice(0, -1).trimEnd();
+    if (continuationChars.includes(line.slice(-1)) || isSpacedContinuation(line)) {
+      line = line.slice(0, -1).trimEnd();
+    }
     if (line) segments.push(line);
   }
   return segments.join(" ");

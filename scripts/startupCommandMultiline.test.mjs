@@ -91,3 +91,28 @@ test("the PTY startup formatter joins multi-line commands before the Codex direc
   assert.match(source, /joinStartupCommandLines\(command, shell \?\? null\)/);
   assert.match(source, /isDirectCodexStartupCommand\(singleLineCommand\)/);
 });
+
+test("regression: a CMD project accepts Bash-style backslash continuation", () => {
+  // 用户实测：CMD 项目里按 Bash 习惯用反斜杠续行，续行符没被去掉而被当成命令内容送进终端，
+  // ssh 报 hostname contains invalid characters。
+  const command = [
+    "ssh -p 3222 \\",
+    "-L 16379:127.0.0.1:16379 \\",
+    "-L 13306:127.0.0.1:3306 \\",
+    "-L 15433:127.0.0.1:5433 \\",
+    "root@107.172.78.135",
+  ].join("\n");
+  const expected =
+    "ssh -p 3222 -L 16379:127.0.0.1:16379 -L 13306:127.0.0.1:3306 -L 15433:127.0.0.1:5433 root@107.172.78.135";
+  assert.equal(joinStartupCommandLines(command, "cmd"), expected);
+  assert.equal(joinStartupCommandLines(command, "powershell"), expected);
+  assert.equal(joinStartupCommandLines(command, "pwsh"), expected);
+  assert.equal(expected.includes("\\"), false);
+});
+
+test("another shell's continuation character is honoured when written as a separate marker", () => {
+  assert.equal(joinStartupCommandLines("ssh `\n-L 1\nhost", "cmd"), "ssh -L 1 host");
+  assert.equal(joinStartupCommandLines("ssh ^\n-L 1\nhost", "bash"), "ssh -L 1 host");
+  // 与内容连写时不当作续行符：CMD/PowerShell 里行尾反斜杠仍按字面保留。
+  assert.equal(joinStartupCommandLines("cd C:\\\nnpm run dev", "cmd"), "cd C:\\ npm run dev");
+});
