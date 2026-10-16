@@ -158,3 +158,24 @@ V1.4.4：隔离根 Pi 与子实例，按运行代际拦截重复和过期完成�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 136: 终端字素宽度与 Pi 滚动条验证（#285/#286）
+
+**Date**: 2026-10-16
+**Task**: 终端字素宽度与 Pi 滚动条验证（#285/#286）
+**Branch**: `master`
+
+### Summary
+
+桌面与 Web 统一 Unicode 15 字素宽度，保留两端 Unicode 11 构建回退；验证本机 Pi always 滚动条预留末列。合并 origin/master 后 144 项定向测试、两端类型检查和严格架构检查通过，双端生产构建已通过。用户确认验证完成并授权提交；按要求删除独立兼容说明文档并清理引用，更新 V1.4.4 记录和终端契约。未推送。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b77fc5e7` | (see git log) |
+
+### Status
+
+[OK] **Completed**
