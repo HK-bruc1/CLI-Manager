@@ -5,10 +5,10 @@ import {
 import { Terminal, type IBufferRange, type ILink, type IViewportRange } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { canAnswerTerminalQuery, installTerminalQueryPolicy } from "../../../shared/lib/terminalQueryPolicy";
+import { installTerminalUnicode } from "../../../shared/lib/terminalUnicode";
 import { ImageAddon } from "@xterm/addon-image";
 import { SearchAddon } from "@xterm/addon-search";
 import { SerializeAddon } from "@xterm/addon-serialize";
-import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { invoke } from "@tauri-apps/api/core";
 import { useShallow } from "zustand/shallow";
@@ -965,7 +965,6 @@ export function useXTermController({ sessionId, isActive = true, isVisible = tru
     const fitAddon = new FitAddon();
     const searchAddon = new SearchAddon({ highlightLimit: SEARCH_HIGHLIGHT_LIMIT });
     const serializeAddon = new SerializeAddon();
-    const unicode11Addon = new Unicode11Addon();
     const webLinksAddon = new WebLinksAddon(
       (event, uri) => {
         if (shouldActivateTerminalLink(event)) openHttpUrl(sessionId, uri);
@@ -1045,8 +1044,7 @@ export function useXTermController({ sessionId, isActive = true, isVisible = tru
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(searchAddon);
     terminal.loadAddon(serializeAddon);
-    terminal.loadAddon(unicode11Addon);
-    terminal.unicode.activeVersion = "11";
+    installTerminalUnicode(terminal);
     terminal.loadAddon(webLinksAddon);
     terminal.open(containerRef.current);
     const updateScrollToBottomButton = () => {
