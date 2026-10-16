@@ -938,7 +938,9 @@ async fn install_then_uninstall_pi_extension() {
     assert!(extension.contains("session_start"));
     assert!(extension.contains("agent_start"));
     assert!(extension.contains("agent_settled"));
-    assert!(!extension.contains("before_agent_start"));
+    // before_agent_start 只跟踪代际，对外 running 仍仅从 agent_start 上报一次。
+    assert!(extension.contains("before_agent_start"));
+    assert_eq!(extension.matches("postHookEvent(\"UserPromptSubmit\")").count(), 1);
     assert!(extension.contains("void postHookEvent"));
     assert!(!extension.contains("await postHookEvent"));
     assert!(extension.contains("AbortController"));

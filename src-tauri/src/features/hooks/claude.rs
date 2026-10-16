@@ -28,6 +28,7 @@ const MAX_APPROVAL_PROGRESS_TOMBSTONES: usize = 512;
 struct RecentHookEvents {
     ids: HashSet<String>,
     order: VecDeque<String>,
+    pi: pi_admission::PiHookAdmission,
 }
 
 impl RecentHookEvents {
@@ -87,6 +88,7 @@ struct ClaudeHookRequest {
     remote_agent_transcript_ref: Option<String>,
     remote_event_id: Option<String>,
     remote_sequence: Option<u64>,
+    pi: Option<pi_admission::PiHookIdentity>,
 }
 
 #[derive(Clone, Serialize)]
@@ -618,6 +620,9 @@ pub fn spawn_hook_listener(listener: TcpListener, token: String, sink: HookPaylo
 #[path = "legacy_goal.rs"]
 mod legacy_goal;
 
+#[path = "pi_admission.rs"]
+mod pi_admission;
+
 // 校验及去重后补全旧本机 Codex Stop 的 goal 元数据，再向所有出口分发。
 fn handle_stream(
     mut stream: TcpStream,
@@ -664,10 +669,24 @@ fn handle_stream(
         return;
     }
 
-    let accepted = recent_events
-        .lock()
-        .map(|mut recent| recent.accept(payload.remote_event_id.as_deref()))
-        .unwrap_or(true);
+    // Pi 的接纳锁持续到 sink 返回，避免并发 HTTP 请求通过检查后又倒序分发。
+    // 身份只在入口消费，既有 daemon/回放协议继续接收标准事件。
+    let is_pi = normalize_source(payload.source.as_deref()) == "pi";
+    let mut recent = recent_events.lock().ok();
+    let accepted = recent
+        .as_mut()
+        .map(|recent| {
+            recent.accept(payload.remote_event_id.as_deref()) && recent.pi.accept(&payload)
+        })
+        .unwrap_or(!is_pi);
+    if is_pi {
+        debug!(
+            "pi hook admission: event={} session={:?} sequence={:?} accepted={}",
+            payload.event, payload.session_id, payload.remote_sequence, accepted
+        );
+    } else {
+        drop(recent.take());
+    }
     if !accepted {
         write_response(&mut stream, "204 No Content", "");
         return;
@@ -799,6 +818,7 @@ pub fn remote_hook_payload_from_spool(
         remote_agent_transcript_ref: string("agentTranscriptPath"),
         remote_event_id: string("eventId"),
         remote_sequence: value.get("sequence").and_then(serde_json::Value::as_u64),
+        pi: None,
     };
     if !is_valid_payload(&request) {
         return Err("remote_hook_payload_invalid".to_string());
@@ -918,6 +938,11 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
 
 // 验证标签与可选事件 ID 长度，并按来源白名单检查事件名称。
 fn is_valid_payload(payload: &ClaudeHookRequest) -> bool {
+    if let Some(identity) = &payload.pi {
+        if payload.source.as_deref() != Some("pi") || !identity.valid() {
+            return false;
+        }
+    }
     let tab_id = payload.tab_id.trim();
     if tab_id.is_empty() || tab_id.len() > 128 {
         return false;
@@ -1000,7 +1025,7 @@ fn is_valid_payload(payload: &ClaudeHookRequest) -> bool {
         ),
         "pi" => matches!(
             payload.event.as_str(),
-            "SessionStart" | "UserPromptSubmit" | "Stop"
+            "SessionStart" | "UserPromptSubmit" | "Stop" | "Interrupt" | "StopFailure"
         ),
         "opencode" => matches!(
             payload.event.as_str(),

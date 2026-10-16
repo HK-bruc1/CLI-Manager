@@ -66,107 +66,14 @@ pub(super) fn pi_extension_source(modules: &[PiHookModule]) -> String {
         .iter()
         .any(|module| matches!(module, PiHookModule::Stop));
 
-    // 内嵌 nonEmpty：修剪可选字符串，空值返回 null，不读写外部状态。
-    // 内嵌 postHookEvent：缺少回调环境即返回；从当前运行环境上报 WSL 身份，携带令牌 POST，吞掉异常并清理计时器。
-    // 内嵌 setTimeout 回调：一秒后中止该次 fetch，不启动重试；中止异常由 postHookEvent 捕获。
-    // 内嵌 readSessionId：调用可选会话管理器取得 ID，调用异常或空 ID 返回 null。
-    // 内嵌默认扩展函数：仅为启用模块注册 Pi 监听器，不等待通知请求，也不捕获注册异常。
-    // 内嵌 session_start 回调：读取会话 ID，异步发送 SessionStart，不阻塞 Pi 生命周期。
-    // 内嵌 agent_start 回调：读取会话 ID，异步发送 UserPromptSubmit，由发送函数处理网络失败。
-    // 内嵌 agent_settled 回调：读取会话 ID，异步发送 Stop，由发送函数处理网络失败。
-    let mut source = format!(
-        r#"// {marker}
-// Managed by CLI-Manager. Do not edit manually; reinstall from Hook settings.
-// Bridges Pi Agent lifecycle events into CLI-Manager tab notifications / live stats.
-
-import type {{ ExtensionAPI }} from "@earendil-works/pi-coding-agent";
-
-const MARKER = "{marker}";
-const ENABLED = {{
-  sessionStart: {session_start},
-  running: {running},
-  stop: {stop},
-}};
-
-type NotifyEvent = "SessionStart" | "UserPromptSubmit" | "Stop";
-const HOOK_TIMEOUT_MS = 1_000;
-
-function nonEmpty(value: string | undefined | null): string | null {{
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}}
-
-async function postHookEvent(event: NotifyEvent, sessionId: string | null, message?: string | null) {{
-  const tabId = nonEmpty(process.env.CLI_MANAGER_TAB_ID);
-  const port = nonEmpty(process.env.CLI_MANAGER_NOTIFY_PORT);
-  const token = nonEmpty(process.env.CLI_MANAGER_NOTIFY_TOKEN);
-  if (!tabId || !port || !token) return;
-
-  const payload = {{
-    tabId,
-    source: "pi",
-    event,
-    message: message ?? null,
-    sessionId,
-    cwd: process.cwd(),
-    wslDistroName: nonEmpty(process.env.WSL_DISTRO_NAME),
-    timestamp: new Date().toISOString(),
-  }};
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), HOOK_TIMEOUT_MS);
-  try {{
-    await fetch(`http://127.0.0.1:${{port}}/api/claude-hook`, {{
-      method: "POST",
-      headers: {{
-        Authorization: `Bearer ${{token}}`,
-        "Content-Type": "application/json",
-      }},
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    }});
-  }} catch {{
-    // Hook bridge failures must never interrupt Pi.
-  }} finally {{
-    clearTimeout(timeout);
-  }}
-}}
-
-function readSessionId(ctx: {{ sessionManager?: {{ getSessionId?: () => string | undefined }} }}): string | null {{
-  try {{
-    return nonEmpty(ctx.sessionManager?.getSessionId?.() ?? null);
-  }} catch {{
-    return null;
-  }}
-}}
-
-export default function (pi: ExtensionAPI) {{
-  if (ENABLED.sessionStart) {{
-    pi.on("session_start", (_event, ctx) => {{
-      void postHookEvent("SessionStart", readSessionId(ctx));
-    }});
-  }}
-
-  if (ENABLED.running) {{
-    pi.on("agent_start", (_event, ctx) => {{
-      void postHookEvent("UserPromptSubmit", readSessionId(ctx));
-    }});
-  }}
-
-  if (ENABLED.stop) {{
-    pi.on("agent_settled", (_event, ctx) => {{
-      void postHookEvent("Stop", readSessionId(ctx));
-    }});
-  }}
-
-  void MARKER;
-}}
-"#,
-        marker = PI_EXTENSION_MARKER,
-        session_start = if session_start { "true" } else { "false" },
-        running = if running { "true" } else { "false" },
-        stop = if stop { "true" } else { "false" },
-    );
+    // 独立模板保留运行身份、取消/失败分类与非阻塞投递；仅替换模块开关。
+    let mut source = include_str!("pi_extension.ts")
+        .replace(
+            "__SESSION_START__",
+            if session_start { "true" } else { "false" },
+        )
+        .replace("__RUNNING__", if running { "true" } else { "false" })
+        .replace("__STOP__", if stop { "true" } else { "false" });
 
     for module in modules {
         source.push_str(&format!("// {}\n", pi_module_marker(*module)));
