@@ -126,3 +126,7 @@ The user asked to review the Tap Web UI/interaction against the current Tap-Code
 | `npm run check:architecture -- --strict`, `git diff --check` | Passed (1391 files, none above 2000 lines) |
 
 Still pending as before: Windows/WSL real CLI binding, real iOS/Android keyboards and touch, installer/portable launch.
+
+## Ready for review (2026-10-16)
+
+The user approved moving PR #287 out of Draft. GitHub reported `MERGEABLE` / `CLEAN` with no status checks (upstream has release workflows only) and no reviews yet. The three platform items that cannot be run on this Linux host (Windows/WSL real CLI binding and permissions, installer/portable launch with the new `apps/web/dist/tap` resources, real iOS/Android keyboards/touch/PWA through that desktop host) remain unchecked and are handed to the maintainer in the PR body; they are not claimed as verified.

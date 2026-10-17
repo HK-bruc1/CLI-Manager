@@ -29,7 +29,7 @@
     "apps/server/src/lib.rs",
     ".trellis/spec/backend/web-service-contracts.md"
   ],
-  "notes": "Detailed pre-submit review completed and both approved code commits pushed to nnnmdzz:feat/optional-tap-web. Draft PR #287 is OPEN against dark-hxx/CLI-Manager:master; Draft/base/head/SHA verified. Reproduced review defects are fixed and covered in review.md. Keep task in progress for upstream review and real Windows/WSL/mobile/clean locked-install acceptance; no merge/deploy/archive.",
+  "notes": "Detailed pre-submit review completed and both approved code commits pushed to nnnmdzz:feat/optional-tap-web. Draft PR #287 is OPEN against dark-hxx/CLI-Manager:master; Draft/base/head/SHA verified. Reproduced review defects are fixed and covered in review.md. Keep task in progress for upstream review and real Windows/WSL/mobile/clean locked-install acceptance; no merge/deploy/archive. UI/interaction alignment with Tap-Code pushed as 70d6bf8; the user then approved Ready for review, handing Windows/WSL CLI binding, installer/portable launch and real phone input to maintainer verification.",
   "meta": {
     "verification": "verification.md",
     "pr_body": "pr-body.md",

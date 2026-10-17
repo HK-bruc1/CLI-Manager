@@ -1,6 +1,6 @@
 ## 背景
 
-提供一套会话导向、移动优先的可选 Web 工作台，借鉴 Tap-Code 的输入与会话接力体验。**经典 Web 不删除、不改默认入口**；新端位于 `/tap/`，适合先以 Draft 审阅“双 Web”的职责与维护边界。
+提供一套会话导向、移动优先的可选 Web 工作台，借鉴 Tap-Code 的输入与会话接力体验。**经典 Web 不删除、不改默认入口**；新端位于 `/tap/`，请一并审阅“双 Web”的职责与维护边界。
 
 Trellis 任务：`.trellis/tasks/10-16-optional-tap-web`，含 PRD、设计、实施计划、协议 fixture、[验证记录](https://github.com/nnnmdzz/CLI-Manager/blob/feat/optional-tap-web/.trellis/tasks/10-16-optional-tap-web/verification.md)和[提交前双轴复审](https://github.com/nnnmdzz/CLI-Manager/blob/feat/optional-tap-web/.trellis/tasks/10-16-optional-tap-web/review.md)。按上游 Codex inline 配置实施与检查，不声称独立多代理审计。
 
@@ -28,7 +28,7 @@ Trellis 任务：`.trellis/tasks/10-16-optional-tap-web`，含 PRD、设计、�
 - [x] 界面对齐后按新交互更新受控 host 选择器并重跑通过：键帽仅在终端视图、结束确认在切换会话时收起而不改目标、设备菜单、右侧栏文件预览、设置分段控件。另以 CDP 触摸验证手机左右抽屉边缘滑入/拖动关闭，并检查深色与英文布局。
 - [x] 详细复审复现并修复 11 项边界缺陷：确认目标冻结、跨设备旧回调/迟到 401、授权取消回放、单渲染器重连保留其他挂载、输入法 Esc/直接输入退出/字体拒绝、Unicode 截断与写屏合批/全局调度。新增生产浏览器回归含 5001 帧合为 4 次写屏、两终端分帧和粘贴后断线不补发 Enter。
 - [x] 严格 2000 行架构检查、`git diff --check`。界面 detector 无发现为上一轮结果，本轮界面改动未重跑。
-- [ ] Windows/WSL 真 CLI 会话绑定与权限交互、真实 iOS/Android 软键盘/触控/PWA、安装包与 portable 启动。
+- [ ] **需要维护者在 Windows 上验收**（作者环境为 Linux，缺 GTK/WebKitGTK，无法构建桌面端）：① Windows/WSL 真 CLI 的会话绑定与权限交互；② 安装包与 portable 启动（`tauri.conf.json` 新增 `apps/web/dist/tap` 资源，原生 Rust 仅新增两处 `terminal.transcript` 能力名）；③ 经该桌面端连接时真实 iOS/Android 的软键盘、触控与 PWA。
 
 截图来自协议 fixture（已按本轮界面更新），不冒充真实 CLI。[桌面对话](https://github.com/nnnmdzz/CLI-Manager/blob/feat/optional-tap-web/.trellis/tasks/10-16-optional-tap-web/screenshots/desktop-chat.png) · [手机终端](https://github.com/nnnmdzz/CLI-Manager/blob/feat/optional-tap-web/.trellis/tasks/10-16-optional-tap-web/screenshots/mobile.png) · [手机抽屉](https://github.com/nnnmdzz/CLI-Manager/blob/feat/optional-tap-web/.trellis/tasks/10-16-optional-tap-web/screenshots/mobile-drawer.png) · [手机对话](https://github.com/nnnmdzz/CLI-Manager/blob/feat/optional-tap-web/.trellis/tasks/10-16-optional-tap-web/screenshots/mobile-chat.png)。
 
@@ -41,4 +41,4 @@ Trellis 任务：`.trellis/tasks/10-16-optional-tap-web`，含 PRD、设计、�
 - 本机 build 使用补齐的依赖环境，Vite/React 与锁定版本有差异，不等同于 clean locked-install CI。锁文件只新增 workspace/link 元数据；详见验证记录的环境限定。
 - Tap-Code 尚无项目级 LICENSE，本 PR 只借鉴交互规则，不搬其源文件或图标，不推定商业再许可；新实现沿用本仓库 AGPL，字体随附 OFL。
 
-请优先审阅：是否接受独立可选客户端、共享模块边界、`terminal.transcript` 只读契约。Draft 保持，待补实机验收后再考虑 ready；本 PR 不包含合并或部署动作。
+请优先审阅：是否接受独立可选客户端、共享模块边界、`terminal.transcript` 只读契约。上方未勾选的三项请在 Windows 上验收后再合并；本 PR 不包含合并或部署动作。
