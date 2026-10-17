@@ -11,4 +11,4 @@
 - [x] 歷史目錄快取：全量掃描後清除同一根目錄的依來源快取（`discovery.rs`），新增 `tests/session_file_cache.rs`。
 - [x] 契約、TEMP changelog、功能清單、`apps/web-tap` 的 README／DESIGN。
 - [x] 驗證：見 `verification.md`。
-- [ ] 推送與開 PR（使用者已同意：測試通過即推送並開新 PR，PR 說明用簡體中文、不寫授權說明）。
+- [x] 推送到 fork 並開 [PR #289](https://github.com/dark-hxx/CLI-Manager/pull/289)（簡體中文說明、不含授權說明）；Windows 驗收交由維護者。

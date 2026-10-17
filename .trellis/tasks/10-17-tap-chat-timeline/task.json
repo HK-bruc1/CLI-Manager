@@ -15,8 +15,8 @@
   "branch": "feat/tap-chat-timeline",
   "base_branch": "master",
   "worktree_path": null,
-  "commit": null,
-  "pr_url": null,
+  "commit": "eaabfb5e7665e473d32e7d8625874b761dc8046f",
+  "pr_url": "https://github.com/dark-hxx/CLI-Manager/pull/289",
   "subtasks": [],
   "children": [],
   "parent": "tap-chat-reading",
@@ -29,7 +29,7 @@
     ".trellis/spec/backend/web-service-contracts.md",
     ".trellis/spec/backend/history-index-contracts.md"
   ],
-  "notes": "Rebuilt on the maintainer's 63bae0f/a6aeb76 direction after closing #288. The Linux author machine cannot compile src-tauri (no GTK/WebKitGTK); the discovery change was compiled and tested in a stub harness extracted verbatim from the real file.",
+  "notes": "Rebuilt on the maintainer's 63bae0f/a6aeb76 direction after closing #288. The Linux author machine cannot compile src-tauri (no GTK/WebKitGTK); the discovery change was compiled and tested in a stub harness extracted verbatim from the real file. PR #289 opened against dark-hxx/CLI-Manager:master (mergeable); Windows/WSL, src-tauri cargo test and long-running DB checks are left to the maintainer.",
   "meta": {
     "verification": "verification.md"
   }
