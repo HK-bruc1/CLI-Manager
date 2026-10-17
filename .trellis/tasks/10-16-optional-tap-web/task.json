@@ -15,8 +15,8 @@
   "branch": "feat/optional-tap-web",
   "base_branch": "master",
   "worktree_path": null,
-  "commit": null,
-  "pr_url": null,
+  "commit": "0c954db4dd1420a1f99ab1ee935ddb615518b90d",
+  "pr_url": "https://github.com/dark-hxx/CLI-Manager/pull/287",
   "subtasks": [],
   "children": [],
   "parent": null,
@@ -29,7 +29,7 @@
     "apps/server/src/lib.rs",
     ".trellis/spec/backend/web-service-contracts.md"
   ],
-  "notes": "User approved the two-commit plan, branch push and Draft PR subject to detailed pre-submit review. Reproduced review defects are fixed and covered in review.md; real Windows/WSL/mobile and clean locked-install acceptance remain explicit draft gates.",
+  "notes": "Detailed pre-submit review completed and both approved code commits pushed to nnnmdzz:feat/optional-tap-web. Draft PR #287 is OPEN against dark-hxx/CLI-Manager:master; Draft/base/head/SHA verified. Reproduced review defects are fixed and covered in review.md. Keep task in progress for upstream review and real Windows/WSL/mobile/clean locked-install acceptance; no merge/deploy/archive.",
   "meta": {
     "verification": "verification.md",
     "pr_body": "pr-body.md",

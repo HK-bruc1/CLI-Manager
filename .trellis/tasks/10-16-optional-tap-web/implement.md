@@ -15,6 +15,8 @@ Execution: inline, as required by `.trellis/config.yaml`; approval is the user's
 - [x] Run bounded desktop/phone browser verification against a temporary protocol fixture; fix observed defects; capture artifacts. Review data/operation/input boundaries.
 - [x] Update Web contract, TEMP changelog, feature inventory, task verification and PR body.
 - [x] Receive upstream Trellis one-shot approval for the two commits and Draft submission, conditional on detailed pre-submit review; complete the two-axis review and reproduced-defect regressions (`review.md`).
-- [ ] Execute the approved two commits, push only the contribution branch and submit the prepared Draft PR. Fork existence verified; no merge/deploy.
+- [x] Execute the approved two commits, push only the contribution branch and submit [Draft PR #287](https://github.com/dark-hxx/CLI-Manager/pull/287). Verified OPEN/Draft, upstream master, fork/head and feature commit SHA; no merge/deploy.
+
+Remain in progress for upstream review and the native/mobile/clean-install acceptance listed in `verification.md`; do not archive this task as fully accepted.
 
 Evidence and environment qualifications: `verification.md`. Proposed commits: `refactor(web): share browser transport and terminal primitives`, then `feat(web): add optional Tap workspace`. No original Tap-Code source edits or unrelated upstream work are included.
