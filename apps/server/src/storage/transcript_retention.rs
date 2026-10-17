@@ -8,8 +8,8 @@ use super::Storage;
 use crate::error::AppError;
 use std::sync::atomic::Ordering;
 
-/// 會被輪詢的轉錄 operation 種類（舊版純文字與新版事件）。
-const TRANSCRIPT_OPERATION_KINDS: [&str; 2] = ["terminal.transcript", "terminal.transcript_events"];
+/// 會被對話頁輪詢的轉錄 operation 種類。
+const TRANSCRIPT_OPERATION_KINDS: [&str; 1] = ["terminal.transcript"];
 /// 結束後保留兩分鐘：瀏覽器最多等 60 秒，保留期內仍能用 GET 補拿結果。
 const RETENTION_MS: i64 = 120_000;
 /// 兩次清理至少間隔 30 秒，輪詢再頻繁也不會每次都掃資料表。
@@ -42,7 +42,7 @@ impl Storage {
              WHERE json_extract(payload_json, '$.type') = 'operation.updated'
                AND json_extract(payload_json, '$.operation.id') IN (
                    SELECT id FROM operations
-                   WHERE kind IN ('terminal.transcript', 'terminal.transcript_events')
+                   WHERE kind = 'terminal.transcript'
                      AND status IN ('succeeded', 'failed', 'rejected', 'timed_out', 'canceled')
                      AND updated_at < ?1
                )",
@@ -52,7 +52,7 @@ impl Storage {
         .await?;
         let removed = sqlx::query(
             "DELETE FROM operations
-             WHERE kind IN ('terminal.transcript', 'terminal.transcript_events')
+             WHERE kind = 'terminal.transcript'
                AND status IN ('succeeded', 'failed', 'rejected', 'timed_out', 'canceled')
                AND updated_at < ?1",
         )
@@ -158,7 +158,6 @@ mod tests {
     #[test]
     fn only_transcript_kinds_are_pruned() {
         assert!(is_transcript_operation("terminal.transcript"));
-        assert!(is_transcript_operation("terminal.transcript_events"));
         assert!(!is_transcript_operation("terminal.attach_image"));
         assert!(!is_transcript_operation("git.status"));
     }
@@ -171,13 +170,13 @@ mod tests {
         let stale = operation(
             &storage,
             &user_id,
-            "terminal.transcript_events",
+            "terminal.transcript",
             "a",
             "succeeded",
             old,
         )
         .await;
-        let legacy = operation(
+        let failed = operation(
             &storage,
             &user_id,
             "terminal.transcript",
@@ -189,7 +188,7 @@ mod tests {
         let fresh = operation(
             &storage,
             &user_id,
-            "terminal.transcript_events",
+            "terminal.transcript",
             "c",
             "succeeded",
             now - 1_000,
@@ -198,7 +197,7 @@ mod tests {
         let pending = operation(
             &storage,
             &user_id,
-            "terminal.transcript_events",
+            "terminal.transcript",
             "d",
             "running",
             old,
@@ -217,7 +216,7 @@ mod tests {
         let mut expected = vec![fresh.id.clone(), pending.id.clone(), other.id.clone()];
         expected.sort();
         assert_eq!(kept, expected);
-        assert!(!kept.contains(&legacy.id));
+        assert!(!kept.contains(&failed.id));
         let events = remaining(
             &storage,
             "SELECT json_extract(payload_json, '$.operation.id') FROM browser_events
@@ -240,7 +239,7 @@ mod tests {
         operation(
             &storage,
             &user_id,
-            "terminal.transcript_events",
+            "terminal.transcript",
             "a",
             "succeeded",
             old,
