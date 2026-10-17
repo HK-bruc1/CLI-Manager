@@ -3,6 +3,7 @@ export type ResolvedLanguage = Exclude<LanguageMode, "auto">;
 
 const dictionary = {
   "zh-CN": {
+    tapWorkspace: "Tap 工作台",
     projectTools: "项目工具",
     gitChanges: "变更", gitHistory: "历史", gitRepository: "仓库",
     gitBranches: "分支", gitLocalBranches: "本地分支", gitRemoteBranches: "远程分支", gitCurrentBranch: "当前分支",
@@ -386,6 +387,7 @@ const dictionary = {
     close: "关闭",
   },
   "en-US": {
+    tapWorkspace: "Tap workspace",
     projectTools: "Project tools",
     gitChanges: "Changes", gitHistory: "History", gitRepository: "Repository",
     gitBranches: "Branches", gitLocalBranches: "Local branches", gitRemoteBranches: "Remote branches", gitCurrentBranch: "Current branch",

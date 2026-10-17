@@ -9,7 +9,10 @@ import type { CreateSshHostInput, Project, SshAuthMode, UpdateSshHostInput, Work
 import { buildSshConnectionSpec } from "../../remote/api/ssh";
 import { projectWithWorktreeProviderOverrides } from "../api/terminalProject";
 import { resolveProjectStartupCommand } from "../../projects/api/projectStartupCommand";
-import { parseProjectEnvVars } from "../../providers/api/providerSwitching";
+import { parseProjectEnvVars, getProviderSwitchAppType } from "../../providers/api/providerSwitching";
+import { fetchLatestProjectSessionDetail } from "../../history/index";
+import { normalizeProjectPath } from "../api/terminalProject";
+import { terminalTranscriptPage } from "./webTerminalTranscript";
 import { openWindowsTerminal } from "../api/externalTerminal";
 import { requestWebDeviceAction, type WebDeviceActionTarget } from "../../../shared/lib/webDeviceActionBus";
 import { webDeviceApi, type WebDeviceOperation } from "../../../shared/lib/webDevice";
@@ -18,6 +21,7 @@ const MANAGEMENT_KINDS = new Set([
   ...WEB_GIT_READ_KINDS,
   "project.tree.reorder",
   "terminal.attach_image",
+  "terminal.transcript",
   "project.start",
   "project.action",
   "ssh.hosts.list", "ssh.client_status", "ssh.test_connection", "ssh.check_path", "ssh.list_directories",
@@ -416,6 +420,43 @@ async function resolveLocalContext(payload: Payload): Promise<LocalContext> {
   return { project, worktree: worktree ?? null, rootPath };
 }
 
+/** Resolve the selected PTY against its authoritative registered context. */
+async function transcriptContext(payload: Payload) {
+  const context = await resolveLocalContext(payload);
+  const sessionId = requiredString(payload, "sessionId", 128);
+  const session = useTerminalStore.getState().sessions.find((item) => item.id === sessionId);
+  if (!session || session.projectId !== context.project.id
+    || (session.worktreeId ?? null) !== (context.worktree?.id ?? null)
+    || session.environmentType === "ssh" || session.remoteHandoff || (session.kind && session.kind !== "pty"))
+    managementError("history_context_not_found");
+  numberValue(payload, "before", 0, 0, 10_000_000);
+  return { ...context, session };
+}
+
+/** Exact live binding only: do not substitute a recent conversation in the cwd. */
+async function executeTerminalTranscript(payload: Payload) {
+  const { project, rootPath, session } = await transcriptContext(payload);
+  if (!session.cliSessionId) return terminalTranscriptPage(session, null);
+  const cliSessionId = session.cliSessionId;
+  const source = session.cliTool ?? getProviderSwitchAppType(project);
+  if (source !== "claude" && source !== "codex")
+    return { available: false, reason: "unsupported", messages: [], start: 0, total: 0 };
+  const detail = await fetchLatestProjectSessionDetail(rootPath, undefined, source, cliSessionId,
+    { forceCatalogRefresh: true, waitForCatalogRefresh: true, freshDetail: true });
+  // The helper can find an exact ID outside the cwd; never export it until cwd matches.
+  if (!detail || detail === "unchanged" || detail.source !== source
+    || detail.session_id !== cliSessionId
+    || normalizeProjectPath(detail.cwd ?? "") !== normalizeProjectPath(rootPath))
+    return terminalTranscriptPage(session, null);
+  // Session may have been closed/rebound during I/O. Revalidate before publishing content.
+  const current = await transcriptContext(payload);
+  if (current.session.cliSessionId !== cliSessionId
+    || (current.session.cliTool ?? getProviderSwitchAppType(current.project)) !== source
+    || normalizeProjectPath(current.rootPath) !== normalizeProjectPath(rootPath)) return terminalTranscriptPage(current.session, null);
+  return boundedResult(terminalTranscriptPage(session, detail, payload.before as number | undefined),
+    "transcript_too_large", "transcript_too_large");
+}
+
 const MAX_WEB_RESULT_BYTES = 700 * 1024;
 
 function boundedResult<T>(value: T, code: string, message: string): T {
@@ -730,6 +771,11 @@ export async function validateWebManagementOperation(operation: WebDeviceOperati
   const payload = payloadObject(operation);
   requireConfirmation(operation, payload);
 
+  if (operation.kind === "terminal.transcript") {
+    await transcriptContext(payload);
+    return;
+  }
+
   if (operation.kind === "project.tree.reorder") {
     await projectTreeOrder(payload);
     return;
@@ -857,6 +903,7 @@ export function webManagementOperationNeedsConfirmation(operation: WebDeviceOper
 export async function executeWebManagementOperation(operation: WebDeviceOperation, validated = false): Promise<unknown> {
   if (!validated) await validateWebManagementOperation(operation);
   const payload = payloadObject(operation);
+  if (operation.kind === "terminal.transcript") return executeTerminalTranscript(payload);
   if (operation.kind === "project.tree.reorder") return executeProjectTree(payload);
   if (operation.kind === "project.start") return executeProjectStart(payload);
   if (operation.kind === "project.action") return executeProjectAction(payload);
