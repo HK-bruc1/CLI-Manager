@@ -1,10 +1,12 @@
-import { ArrowUpRight, ChevronRight, GitBranch, LogOut, Minus, Monitor, Moon, Plus, Sun } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Folder, GitBranch, LogOut, Minus, Monitor, Moon, Plus, Sun } from "lucide-react";
+import type { ReactNode } from "react";
 import { AgentIcon } from "./AgentIcon";
 import { useSheetClose } from "./Sheet";
 import { CHAT_SIZES, resolved, TERMINAL_SIZES, type Preferences } from "./preferences";
 import type { Translate } from "./i18n";
 import type { WorkspaceModel } from "./useWorkspace";
 import type { WorkspaceProject } from "./protocol";
+import { buildProjectTree, type ProjectTreeNode } from "./projectTree";
 
 function Stepper({ value, range, label, onChange, t }: {
   value: number; range: { min: number; max: number }; label: string; onChange: (value: number) => void; t: Translate;
@@ -74,26 +76,35 @@ export function NewSession({ model, onStart, t }: {
   const online = model.device?.status === "online";
   const close = useSheetClose();
   const start = (project: WorkspaceProject, worktreeId?: string) => { onStart(project, worktreeId); close(); };
+  const tree = buildProjectTree(model.workspace);
+  // The picker and sidebar share desktop group identity/order, including projects without sessions.
+  const renderNodes = (nodes: ProjectTreeNode[]): ReactNode => nodes.map((node) => {
+    if (node.kind === "group") return <section className="tap-picker-group" key={node.key}>
+      <h3><Folder size={14} />{node.group.name}</h3>
+      <div className="tap-picker-children">{node.children.length
+        ? renderNodes(node.children) : <p className="tap-panel-empty">{t("emptyGroup")}</p>}</div>
+    </section>;
+    const { project } = node;
+    const unsupported = project.environmentType === "ssh";
+    return <div className="tap-card" key={node.key}>
+      <button type="button" className="tap-project-row" disabled={model.starting || unsupported || !online} onClick={() => start(project)}>
+        <span className="tap-project-icon"><AgentIcon source={project.source} size={18} /></span>
+        <span className="tap-project-text"><b>{project.name}</b>
+          <small className={unsupported ? undefined : "is-mono"}>{unsupported ? t("unsupportedProject") : project.cwd}</small></span>
+        <ChevronRight size={16} className="tap-row-chevron" />
+      </button>
+      {model.workspace.worktrees.filter((worktree) => worktree.projectId === project.id).map((worktree) => <button type="button"
+        className="tap-project-row is-worktree" key={worktree.id} disabled={model.starting || unsupported || !online || worktree.status === "missing"}
+        onClick={() => start(project, worktree.id)}>
+        <span className="tap-project-icon"><GitBranch size={15} /></span>
+        <span className="tap-project-text"><b>{worktree.name}</b><small className="is-mono">{worktree.branch}</small></span>
+        <ChevronRight size={16} className="tap-row-chevron" />
+      </button>)}
+    </div>;
+  });
   return <div className="tap-new-session">
     <p className="tap-sheet-lead">{t("source")}</p>
-    {!model.workspace.projects.length && <p className="tap-panel-empty">{t("noProjects")}</p>}
-    {model.workspace.projects.map((project) => {
-      const unsupported = project.environmentType === "ssh";
-      return <div className="tap-card" key={project.id}>
-        <button type="button" className="tap-project-row" disabled={model.starting || unsupported || !online} onClick={() => start(project)}>
-          <span className="tap-project-icon"><AgentIcon source={project.source} size={18} /></span>
-          <span className="tap-project-text"><b>{project.name}</b>
-            <small className={unsupported ? undefined : "is-mono"}>{unsupported ? t("unsupportedProject") : project.cwd}</small></span>
-          <ChevronRight size={16} className="tap-row-chevron" />
-        </button>
-        {model.workspace.worktrees.filter((worktree) => worktree.projectId === project.id).map((worktree) => <button type="button"
-          className="tap-project-row is-worktree" key={worktree.id} disabled={model.starting || unsupported || !online || worktree.status === "missing"}
-          onClick={() => start(project, worktree.id)}>
-          <span className="tap-project-icon"><GitBranch size={15} /></span>
-          <span className="tap-project-text"><b>{worktree.name}</b><small className="is-mono">{worktree.branch}</small></span>
-          <ChevronRight size={16} className="tap-row-chevron" />
-        </button>)}
-      </div>;
-    })}
+    {!tree.length && <p className="tap-panel-empty">{t("noProjects")}</p>}
+    {renderNodes(tree)}
   </div>;
 }
