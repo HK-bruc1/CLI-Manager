@@ -43,6 +43,8 @@
 
 ### 4. Validation & Error Matrix
 
+Codex `response_item` function/custom/MCP calls, their outputs, and public reasoning summaries are canonical history messages. Claude tool-only/thinking-only rows must survive even without ordinary text. Preserve call IDs and timestamps; tool outputs have tool role. Read public reasoning fields only, never ciphertext or signatures. Message iteration and file-change references must use the same parser. Activity support uses legacy cache version 15, catalog parser version 4 and V2 adapter parser version 8 so unchanged files are re-derived after upgrading; user-authored logs are untouched.
+
 | Condition | Required behavior |
 |---|---|
 | Query has fewer than 3 characters | Return no global hits; frontend shows the minimum-length hint. |

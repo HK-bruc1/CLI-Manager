@@ -7,7 +7,7 @@ export type { TerminalStream } from "../../../src/shared/lib/webTerminalStream";
 export type {
   AuthStatus, AuthUser, Device, WorkspaceSnapshot, WorkspaceProject, WorkspaceWorktree,
   Operation, JsonObject, JsonValue, BrowserMessage, TerminalControlMode,
-  TerminalTranscript, TranscriptMessage, TerminalOutputFrame,
+  TerminalTranscript, TranscriptMessage, TranscriptPart, TerminalOutputFrame,
 } from "../../../src/shared/types/webBrowser";
 import type { AuthStatus, Device, WorkspaceSnapshot, Operation, JsonObject } from "../../../src/shared/types/webBrowser";
 

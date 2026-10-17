@@ -6,11 +6,13 @@ import type { JsonObject, JsonValue, TerminalStream, TerminalTranscript, Transcr
 import { fill, type Translate } from "./i18n";
 import { clock, duration, modelName } from "./format";
 import { groupTurns, type Turn } from "./turns";
+import { ConversationCodeBlock, ConversationCodeI18n } from "./ConversationCodeBlock";
+import { ConversationActivity } from "./ConversationActivity";
 
 /** Update visible history in response to output; idle/hidden chats never poll continuously. */
-export function Conversation({ sessionId, context, run, stream, active, supported, chatSize, onTerminal, t }: {
+export function Conversation({ sessionId, context, run, stream, active, supported, chatSize, onTerminal, onReconnect, t }: {
   sessionId: string; context: JsonObject; run: (kind: string, payload: JsonObject) => Promise<JsonValue>;
-  stream: TerminalStream; active: boolean; supported: boolean; chatSize: number; onTerminal: () => void; t: Translate;
+  stream: TerminalStream; active: boolean; supported: boolean; chatSize: number; onTerminal: () => void; onReconnect: () => void; t: Translate;
 }) {
   const [page, setPage] = useState<TerminalTranscript>();
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
@@ -38,7 +40,9 @@ export function Conversation({ sessionId, context, run, stream, active, supporte
     if (before !== undefined && box.current) reading.current = { height: box.current.scrollHeight, top: box.current.scrollTop };
     setLoading(true);
     try {
-      const result = await options.current.run("terminal.transcript", { ...options.current.context, sessionId, ...(before !== undefined ? { before } : {}) });
+      const result = await options.current.run("terminal.transcript", {
+        ...options.current.context, sessionId, includeDetails: true, ...(before !== undefined ? { before } : {}),
+      });
       if (!alive.current) return;
       const value = result as unknown as TerminalTranscript;
       if (!value || !Array.isArray(value.messages)) throw new Error("invalid_transcript");
@@ -105,7 +109,8 @@ export function Conversation({ sessionId, context, run, stream, active, supporte
           {loading ? <LoaderCircle size={15} className="tap-spin" aria-label={t("loading")} />
             : <button type="button" onClick={() => void load(page.start)}>{t("older")}</button>}
         </div>}
-        {notice && <div className="tap-chat-notice"><MessageSquareDashed size={14} /><p>{t(notice as "noChat")}</p>
+        {notice && <div className="tap-chat-notice" role="status"><MessageSquareDashed size={14} /><p>{t(notice as "noChat")}</p>
+          {!supported && <button type="button" className="tap-text-button" onClick={onReconnect}>{t("reconnect")}</button>}
           <button type="button" className="tap-text-button" onClick={onTerminal}><SquareTerminal size={14} />{t("openTerminal")}</button>
         </div>}
         {error && <div className="tap-chat-notice is-error" role="alert"><p>{t("error")}</p>
@@ -123,22 +128,27 @@ export function Conversation({ sessionId, context, run, stream, active, supporte
   </div>;
 }
 
-/** Interim replies fold into one row once the turn is done; the final answer stays open. */
+/** Process details always start folded, including while new output arrives. */
 function TurnView({ turn, live, t }: { turn: Turn; live: boolean; t: Translate }) {
   const [open, setOpen] = useState(false);
   const steps = turn.steps.length;
   const model = modelName(turn.answer?.model ?? turn.steps.at(-1)?.model);
-  const label = turn.elapsed !== undefined ? fill(t("workedFor"), { time: duration(turn.elapsed) })
-    : steps ? fill(t("interimReplies"), { n: steps }) : "";
-  const expanded = open || live;
+  const label = steps ? fill(t("processSteps"), { n: steps })
+    : turn.elapsed !== undefined ? fill(t("workedFor"), { time: duration(turn.elapsed) }) : "";
   return <li className="tap-turn">
     {turn.prompt && <UserBubble message={turn.prompt} t={t} />}
-    {(steps > 0 || (label && model)) && <button type="button" className="tap-fold" aria-expanded={expanded}
+    {(steps > 0 || (label && model)) && <button type="button" className="tap-fold" aria-expanded={open}
       disabled={!steps} onClick={() => setOpen(!open)}>
-      {steps > 0 && <ChevronRight size={13} className={expanded ? "is-open" : undefined} />}
+      {steps > 0 && <ChevronRight size={13} className={open ? "is-open" : undefined} />}
+      {live && <LoaderCircle size={13} className="tap-spin" aria-label={t("statusRunning")} />}
       {model && <span className="tap-fold-model">{model}</span>}<span>{label}</span>
+      {steps > 0 && turn.elapsed !== undefined && <span>{fill(t("workedFor"), { time: duration(turn.elapsed) })}</span>}
     </button>}
-    {expanded && turn.steps.map((message) => <Message key={message.id} message={message} t={t} />)}
+    <div className="tap-process" hidden={!open}>
+      {turn.steps.map((message) => message.parts
+        ? <ConversationActivity key={message.id} message={message} t={t} />
+        : <Message key={message.id} message={message} t={t} />)}
+    </div>
     {turn.answer && <Message message={turn.answer} t={t} />}
     {turn.answer && <Footer message={turn.answer} t={t} />}
   </li>;
@@ -156,10 +166,12 @@ function UserBubble({ message, t }: { message: TranscriptMessage; t: Translate }
 /** Message HTML remains escaped; links can only navigate through Markdown's safe URL handling. */
 function Message({ message, t }: { message: TranscriptMessage; t: Translate }) {
   return <article className="tap-message">
-    <Markdown remarkPlugins={[remarkGfm]} components={{
+    <ConversationCodeI18n value={t}><Markdown remarkPlugins={[remarkGfm]} components={{
       a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
       table: ({ children }) => <div className="tap-table"><table>{children}</table></div>,
-    }}>{message.text}</Markdown>
+      // A stable component type preserves folding/copy state while transcript text refreshes.
+      pre: ConversationCodeBlock,
+    }}>{message.text}</Markdown></ConversationCodeI18n>
     {message.truncated && <small className="tap-truncated">{t("truncated")}</small>}
   </article>;
 }

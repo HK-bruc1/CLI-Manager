@@ -130,6 +130,27 @@ function modelFixture() {
     start: (item) => starts.push(item.id), attach: (id) => attaches.push(id), starts, attaches };
 }
 
+test("same-name devices expose installed/development channel and conversation support before switching", () => {
+  const content = (node) => node == null || typeof node === "boolean" ? ""
+    : typeof node === "object" ? [node.props?.children].flat(Infinity).map(content).join("") : String(node);
+  for (const language of ["zh-CN", "en-US"]) {
+    const model = modelFixture(), selected = [], t = translator(language);
+    model.devices = [
+      { id: "release", name: "Desktop", status: "online", platform: "windows", clientKind: "release", capabilities: [] },
+      { id: "dev", name: "Desktop", status: "online", platform: "windows", clientKind: "development", capabilities: ["terminal.transcript"] },
+    ];
+    model.device = model.devices[0]; model.deviceId = "release";
+    model.setDeviceId = (id) => selected.push(id);
+    const h = renderHarness("Sidebar", model, language);
+    assert.ok(h.nodes().some((node) => node.props["aria-label"]?.includes(t("release"))));
+    const options = h.nodes().filter((node) => node.props.role === "menuitemradio");
+    assert.ok(content(options[0]).includes(t("release")) && content(options[0]).includes(t("terminalOnly")));
+    assert.ok(content(options[1]).includes(t("development")) && content(options[1]).includes(t("chatSupported")));
+    options[1].props.onClick();
+    assert.deepEqual(selected, ["dev"]);
+  }
+});
+
 test("sidebar renders groups/paths and retains correct starts, session attach and scoped collapse", () => {
   const model = modelFixture();
   const h = renderHarness("Sidebar", model);

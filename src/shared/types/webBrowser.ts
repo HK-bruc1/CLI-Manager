@@ -217,13 +217,24 @@ export type BrowserTerminalCommand =
 
 export type LoadState = "idle" | "loading" | "ready" | "error";
 
+export type TranscriptPart = {
+  id: string;
+  kind: "text" | "tool_call" | "tool_result" | "reasoning";
+  text: string;
+  toolName?: string;
+  callId?: string;
+  truncated?: boolean;
+};
 export type TranscriptMessage = {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool";
   text: string;
   at?: string | null;
   model?: string;
   truncated?: boolean;
+  /** Opt-in canonical details; absent on older hosts and text-only requests. */
+  parts?: TranscriptPart[];
+  partsTruncated?: boolean;
 };
 export type TerminalTranscript = {
   available: boolean;

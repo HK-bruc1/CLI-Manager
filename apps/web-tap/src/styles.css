@@ -133,6 +133,9 @@ button, nav, .tap-dock-status, .tap-keybar { -webkit-user-select: none; user-sel
 .tap-link { display: inline-block; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
 .tap-link.is-waiting { background: var(--ring); }
 .tap-link.is-lost { background: var(--danger); animation: tap-blink 1.2s ease-in-out infinite; }
+.tap-device-option { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tap-device-option > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tap-menu .tap-device-option > small { margin-left: 0; color: var(--muted-fg); font-size: 11px; }
 
 /* App shell: absolute, never a full-screen fixed layer (iOS samples the first fixed layer for the status bar). */
 .tap-app, .tap-login { position: absolute; inset: 0; bottom: auto; z-index: 0; height: 100%; overflow: hidden; background: var(--bg); transition: top 160ms ease-out; }

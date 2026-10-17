@@ -2,6 +2,7 @@
 .tap-session { display: none; height: 100%; min-height: 0; flex-direction: column; container: session / inline-size; }
 .tap-session.is-visible { display: flex; }
 .tap-session { --column: min(100%, max(760px, 78cqi), 1180px); }
+.tap-session.is-chat { --column: min(100%, 800px); }
 .tap-session-content { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 
 /* Terminal */
@@ -36,11 +37,11 @@
 /* Conversation */
 .tap-chat-panel { height: 100%; }
 .tap-chat-wrap { position: relative; height: 100%; }
-.tap-chat { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 14px 18px 64px; }
-.tap-chat-column { width: var(--column); margin: 0 auto; font-size: var(--chat-text, 15px); line-height: 1.6; }
+.tap-chat { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 28px 24px 64px; }
+.tap-chat-column { width: var(--column); margin: 0 auto; font-size: var(--chat-text, 15px); line-height: 1.8; }
 .tap-chat-list { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
-.tap-turn { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.tap-turn + .tap-turn { margin-top: 14px; }
+.tap-turn { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.tap-turn + .tap-turn { margin-top: 24px; }
 .tap-user { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .tap-bubble {
   max-width: min(86%, 620px); padding: 9px 14px; border-radius: 12px; background: var(--bubble); color: var(--bubble-fg);
@@ -56,10 +57,25 @@
 .tap-fold svg { transition: transform 150ms ease; }
 .tap-fold svg.is-open { transform: rotate(90deg); }
 .tap-fold-model { color: var(--fg-2); }
+.tap-process { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.tap-process[hidden], .tap-activity-body[hidden] { display: none; }
+.tap-activity { min-width: 0; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); overflow: hidden; }
+.tap-activity-toggle { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 40px; padding: 8px 10px; text-align: left; font-size: 12.5px; }
+.tap-activity-toggle > svg { flex-shrink: 0; }
+.tap-activity-toggle > svg:first-child { transition: transform 150ms ease; }
+.tap-activity-toggle > svg.is-open { transform: rotate(90deg); }
+.tap-activity-toggle > span { min-width: 0; overflow-wrap: anywhere; }
+.tap-activity-toggle > small { flex-shrink: 0; margin-left: auto; color: var(--muted-fg); }
+.tap-activity-toggle:hover { background: var(--muted); }
+.tap-activity-body { padding: 0 12px 12px; border-top: 1px solid var(--border); }
+.tap-activity-part > p { margin: 10px 0 5px; font-size: 12px; color: var(--muted-fg); }
+.tap-activity-part pre { max-width: 100%; max-height: 360px; margin: 10px 0 0; padding: 10px; overflow: auto;
+  background: var(--bg); border-radius: 6px; font: 12px/1.65 var(--mono); white-space: pre; tab-size: 4; overscroll-behavior: contain; }
+.tap-activity-part pre code { font: inherit; }
 .tap-message { min-width: 0; overflow-wrap: anywhere; }
 .tap-message > :first-child { margin-top: 0; }
 .tap-message > :last-child { margin-bottom: 0; }
-.tap-message p, .tap-message ul, .tap-message ol, .tap-message pre, .tap-message blockquote, .tap-table { margin: 0 0 .7em; }
+.tap-message p, .tap-message ul, .tap-message ol, .tap-message blockquote, .tap-table, .tap-code-block { margin: 0 0 1em; }
 .tap-message h1, .tap-message h2, .tap-message h3, .tap-message h4 { margin: 1.1em 0 .4em; font-size: 1em; font-weight: 600; line-height: 1.4; }
 .tap-message h1 { font-size: 1.25em; }
 .tap-message h2 { font-size: 1.125em; }
@@ -69,9 +85,16 @@
 .tap-message li::marker { color: var(--muted-fg); }
 .tap-message li + li { margin-top: .3em; }
 .tap-message :not(pre) > code { padding: .1em .35em; border-radius: 5px; background: var(--muted); font: .88em var(--mono); }
+.tap-code-block { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.tap-code-head { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--muted); font: 12px/1.5 var(--sans); }
+.tap-code-fold { display: inline-flex; align-items: center; gap: 6px; min-width: 0; min-height: 28px; text-align: left; }
+.tap-code-fold span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tap-code-copy { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; flex-shrink: 0; border-radius: 5px; }
+.tap-code-copy:hover { background: var(--border); }
+.tap-code-feedback { margin-left: auto; color: var(--muted-fg); font-size: 11px; }
 .tap-message pre {
-  padding: 10px 12px; border: 1px solid var(--term-border); border-radius: 10px; background: var(--term-bg); color: #e4e4e7;
-  font: .84em/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
+  max-width: 100%; margin: 0; padding: 14px 16px; overflow-x: auto; overscroll-behavior-x: contain;
+  color: var(--fg); font: .87em/1.65 var(--mono); white-space: pre; overflow-wrap: normal; tab-size: 4;
 }
 .tap-message pre code { font: inherit; }
 .tap-table { max-width: 100%; overflow-x: auto; }

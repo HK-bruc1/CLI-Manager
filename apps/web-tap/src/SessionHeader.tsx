@@ -13,10 +13,10 @@ export type SessionStatus = "running" | "connecting" | "ended" | "offline";
 const statusText = { running: "statusRunning", connecting: "statusConnecting", ended: "statusEnded", offline: "statusOffline" } as const;
 
 /** Session title row: what is running where, the view switch and the session's own actions. */
-export function SessionHeader({ active, title, project, agent, status, linkOk, view, size, chatAvailable, phone, panelOpen, git,
+export function SessionHeader({ sessionId, active, title, project, agent, status, linkOk, view, size, phone, panelOpen, git,
   fontSize, onFontSize, onView, onDrawer, onPanel, onNewSession, onSettings, onEnd, t }: {
-  active: boolean; title: string; project: string; agent: string; status: SessionStatus; linkOk: boolean; view: ViewMode; size: string;
-  chatAvailable: boolean; phone: boolean; panelOpen: boolean; git: GitSummary | null; fontSize: number;
+  sessionId: string; active: boolean; title: string; project: string; agent: string; status: SessionStatus; linkOk: boolean; view: ViewMode; size: string;
+  phone: boolean; panelOpen: boolean; git: GitSummary | null; fontSize: number;
   onFontSize: (size: number) => void; onView: (view: ViewMode) => void; onDrawer: () => void; onPanel: () => void;
   onNewSession: () => void; onSettings: () => void; onEnd: () => void; t: Translate;
 }) {
@@ -38,15 +38,17 @@ export function SessionHeader({ active, title, project, agent, status, linkOk, v
     </div>
     <div className="tap-top-actions">
       {!phone && <span className="tap-crumb" title={project}><Folder size={13} /><span>{project}</span><b>/</b><span>{agent}</span></span>}
-      {chatAvailable && <div className="tap-toggle" role="tablist" aria-label={t("view")}>
-        <button type="button" role="tab" aria-selected={view === "chat"} aria-label={t("chat")} title={t("chat")} onClick={() => onView("chat")}>
+      <div className="tap-toggle" role="tablist" aria-label={t("view")}>
+        <button type="button" role="tab" id={`chat-tab-${sessionId}`} aria-controls={`chat-${sessionId}`}
+          aria-selected={view === "chat"} aria-label={t("chat")} title={t("chat")} onClick={() => onView("chat")}>
           <MessagesSquare size={16} /><span>{t("chat")}</span>
         </button>
-        <button type="button" role="tab" aria-selected={view === "terminal"} aria-label={t("terminal")} title={t("terminal")}
+        <button type="button" role="tab" id={`terminal-tab-${sessionId}`} aria-controls={`terminal-${sessionId}`}
+          aria-selected={view === "terminal"} aria-label={t("terminal")} title={t("terminal")}
           onClick={() => onView("terminal")}>
           <SquareTerminal size={16} /><span>{t("terminal")}</span>
         </button>
-      </div>}
+      </div>
       {phone ? <button type="button" className="tap-icon" aria-label={t("openPanel")} onClick={onPanel}><PanelRight size={18} /></button>
         : <button type="button" className={`tap-changes-chip${panelOpen ? " is-open" : ""}`} aria-pressed={panelOpen}
           aria-label={panelOpen ? t("closePanel") : t("openPanel")} title={panelOpen ? t("closePanel") : t("openPanel")} onClick={onPanel}>

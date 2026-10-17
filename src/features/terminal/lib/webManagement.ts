@@ -453,7 +453,7 @@ async function executeTerminalTranscript(payload: Payload) {
   if (current.session.cliSessionId !== cliSessionId
     || (current.session.cliTool ?? getProviderSwitchAppType(current.project)) !== source
     || normalizeProjectPath(current.rootPath) !== normalizeProjectPath(rootPath)) return terminalTranscriptPage(current.session, null);
-  return boundedResult(terminalTranscriptPage(session, detail, payload.before as number | undefined),
+  return boundedResult(terminalTranscriptPage(session, detail, payload.before as number | undefined, booleanValue(payload, "includeDetails")),
     "transcript_too_large", "transcript_too_large");
 }
 

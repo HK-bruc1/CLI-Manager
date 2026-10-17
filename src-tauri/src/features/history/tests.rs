@@ -31,6 +31,7 @@ mod other_sources;
 mod remote;
 mod scope_paths;
 mod session_pipeline;
+mod transcript_activity;
 mod usage_stats;
 
 mod tool_observations;

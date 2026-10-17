@@ -41,7 +41,7 @@ export function SessionView({ id, active, model, prefs, setPrefs, phone, panelOp
   const disabled = !active || !linkOk || !online || !running;
   const status: SessionStatus = ended ? "ended" : !online ? "offline" : !linkOk || !running ? "connecting" : "running";
   const supported = Boolean(model.device?.capabilities.includes("terminal.transcript"));
-  const view: ViewMode = supported ? chosen ?? defaults.view : "terminal";
+  const view: ViewMode = chosen ?? defaults.view;
   const context = { projectId: session?.projectId ?? "", ...(session?.worktreeId ? { worktreeId: session.worktreeId } : {}) };
   const git = useGit(session ? gitKey(model.user?.id, model.deviceId, session.projectId, session.worktreeId) : undefined, context, model.run, active);
   const clearModifiers = () => setModifiers({ ctrl: false, alt: false });
@@ -62,23 +62,23 @@ export function SessionView({ id, active, model, prefs, setPrefs, phone, panelOp
   const title = session?.title || project?.name || t("app");
   const blocked = ended ? t("blockedEnded") : !online ? t("blockedOffline") : !linkOk || !running ? t("blockedConnecting") : undefined;
   return <section className={`tap-session${active ? " is-visible" : ""} is-${view}`} aria-hidden={!active}>
-    <SessionHeader active={active} title={title} project={worktree ? `${project?.name ?? ""} · ${worktree.name}` : project?.name ?? ""}
+    <SessionHeader sessionId={id} active={active} title={title} project={worktree ? `${project?.name ?? ""} · ${worktree.name}` : project?.name ?? ""}
       agent={agentKey(project?.source)} status={status} linkOk={linkOk && online} view={view} size={info.size}
-      chatAvailable={supported} phone={phone} panelOpen={panelOpen} git={git.summary} fontSize={defaults.fontSize}
+      phone={phone} panelOpen={panelOpen} git={git.summary} fontSize={defaults.fontSize}
       onFontSize={(size) => setPrefs({ ...prefs, fontSize: Math.min(TERMINAL_SIZES.max, Math.max(TERMINAL_SIZES.min, size)) })}
       onView={choose} onDrawer={onDrawer} onPanel={() => onPanel(phone ? undefined : "changes")} onNewSession={onNewSession}
       onSettings={onSettings} onEnd={() => model.end(id)} t={t} />
     <div className="tap-session-content">
-      <div id={`terminal-${id}`} className="tap-terminal-panel" role="tabpanel" hidden={view !== "terminal"}>
+      <div id={`terminal-${id}`} className="tap-terminal-panel" role="tabpanel" aria-labelledby={`terminal-tab-${id}`} hidden={view !== "terminal"}>
         <Terminal ref={terminal} sessionId={id} stream={model.stream} active={active} visible={view === "terminal"}
           connected={!disabled} state={state} fontSize={defaults.fontSize} t={t} onInfo={receive}
           onInput={(text) => model.input(id, text)} onResize={(cols, rows) => model.resize(id, cols, rows)}
           onError={(code) => { if (!code.startsWith("terminal_")) model.setError(code); }} onRetry={() => model.reopen(id)} />
       </div>
-      <div id={`chat-${id}`} className="tap-chat-panel" role="tabpanel" hidden={view !== "chat"}>
+      <div id={`chat-${id}`} className="tap-chat-panel" role="tabpanel" aria-labelledby={`chat-tab-${id}`} hidden={view !== "chat"}>
         {chatOpened && <Suspense fallback={<p className="tap-chat-empty" role="status">{t("loading")}</p>}>
           <Conversation sessionId={id} stream={model.stream} context={context} run={model.run} chatSize={defaults.chatSize}
-            active={active && view === "chat"} supported={supported} onTerminal={() => choose("terminal")} t={t} />
+            active={active && view === "chat"} supported={supported} onTerminal={() => choose("terminal")} onReconnect={model.reconnect} t={t} />
         </Suspense>}
       </div>
     </div>

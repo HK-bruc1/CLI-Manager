@@ -65,3 +65,18 @@ test("changing either CLI identity or source during history I/O withholds the pr
     assert.equal((await pending).available, false, `changed ${field}`);
   }
 });
+
+test("detailed transcript request crosses the native operation boundary only when requested", async () => {
+  for (const source of ["claude", "codex"]) {
+    const f = fixture(async () => ({ ...detail, source, messages: [
+      { role: "assistant", parts: [{ kind: "tool_call", tool_name: "Bash", call_id: "c1", content: "git status" }] },
+      { role: "tool", parts: [{ kind: "tool_result", call_id: "c1", content: "clean" }] },
+    ] }));
+    f.terminals.sessions[0].cliTool = source;
+    assert.equal((await f.run()).messages.length, 0);
+    const page = await f.run({ includeDetails: true });
+    assert.equal(page.messages.length, 2);
+    assert.equal(page.messages[1].parts[0].kind, "tool_result");
+    assert.equal((await f.run({ includeDetails: "yes" })).messages.length, 0, "only a boolean opt-in exports details");
+  }
+});

@@ -53,6 +53,7 @@ export function useWorkspace() {
   const sequence = useRef(0);
   const startingRef = useRef(false);
   const account = useRef<string | null>(null);
+  const accountDeviceScope = useRef<string | null>(null);
   const authGeneration = useRef(0);
   const generation = authGeneration.current;
   // Delayed callbacks retain their originating authority; never reinterpret them on a new device.
@@ -63,6 +64,7 @@ export function useWorkspace() {
     runner.cancel(); socket.current?.close(); stream.clear();
     sequence.current = 0;
     account.current = null; authGeneration.current++;
+    accountDeviceScope.current = null;
     setUser(null); setDevices([]); setDeviceId(undefined); setWorkspace(EMPTY);
     setMounted([]); setActiveId(undefined); setStates({}); setError(""); setAuthError("authExpired");
   }, [runner, stream]);
@@ -70,9 +72,11 @@ export function useWorkspace() {
   const loadDevices = useCallback(async (scopeId?: string | null) => {
     const requestedAccount = account.current;
     const requestedGeneration = authGeneration.current;
+    if (scopeId !== undefined) accountDeviceScope.current = scopeId;
+    const requestedScope = accountDeviceScope.current;
     const { devices: available } = await api.devices();
     if (account.current !== requestedAccount || requestedAccount === null || requestedGeneration !== authGeneration.current) return;
-    const owned = scopeId ? available.filter((device) => device.id === scopeId) : available;
+    const owned = requestedScope ? available.filter((device) => device.id === requestedScope) : available;
     setDevices(owned);
     setDeviceId((current) => owned.some((device) => device.id === current) ? current : owned[0]?.id);
   }, []);
@@ -89,7 +93,7 @@ export function useWorkspace() {
         if (result.authenticated && result.user) {
           account.current = result.user.id;
           setUser(result.user);
-          await loadDevices(result.deviceScope);
+          await loadDevices(result.deviceScope ?? null);
         }
       } catch { if (!cancelled) setAuthError("loginError"); }
       finally { if (!cancelled) setChecking(false); }
@@ -106,7 +110,7 @@ export function useWorkspace() {
       if (generation !== authGeneration.current) return;
       if (!result.user) throw new Error("loginError");
       account.current = result.user.id;
-      setUser(result.user); await loadDevices(result.deviceScope);
+      setUser(result.user); await loadDevices(result.deviceScope ?? null);
     } catch { setAuthError("loginError"); }
     finally { setChecking(false); }
   };
@@ -121,7 +125,7 @@ export function useWorkspace() {
       sequence.current = 0;
       setMounted([]); setActiveId(undefined); setStates({}); setLink("closed"); setDeviceId(undefined); setWorkspace(EMPTY);
       account.current = result.user.id; setUser(result.user);
-      await loadDevices(result.deviceScope); setMobileToken(null);
+      await loadDevices(result.deviceScope ?? null); setMobileToken(null);
     } catch { setAuthError("loginError"); }
     finally { setChecking(false); }
   };
@@ -146,6 +150,31 @@ export function useWorkspace() {
     let refreshFlight: AbortController | undefined;
     let again = false;
     let highWater = 0;
+    let deviceRefreshVersion = 0;
+    let pendingDeviceUpdates = new Set<string>();
+    const ownsDeviceRefresh = () => !disposed && generation === authGeneration.current
+      && user.id === account.current && deviceId === scope.current.deviceId;
+    const refreshDevices = async () => {
+      const version = ++deviceRefreshVersion;
+      const updated = pendingDeviceUpdates = new Set<string>();
+      try {
+        const result = await api.devices();
+        if (!ownsDeviceRefresh() || version !== deviceRefreshVersion) return;
+        // The endpoint authorizes the inventory; also retain the explicit mobile-session scope.
+        const available = result.devices.filter((device) => !accountDeviceScope.current || device.id === accountDeviceScope.current);
+        setDevices((old) => {
+          const next = new Map(old.map((device) => [device.id, device]));
+          for (const device of available) {
+            if (!updated.has(device.id) || !next.has(device.id)) next.set(device.id, device);
+          }
+          return [...next.values()];
+        });
+      } catch (caught) {
+        if (!ownsDeviceRefresh() || version !== deviceRefreshVersion) return;
+        if (caught instanceof ApiError && caught.status === 401) expire();
+        else setError("request_failed");
+      }
+    };
     const refresh = () => {
       if (disposed) return;
       if (refreshFlight) { again = true; return; }
@@ -177,6 +206,7 @@ export function useWorkspace() {
         if (message.type === "ready") {
           highWater = message.latestSequence;
           setLink("open"); refresh();
+          void refreshDevices();
           if (sequence.current > message.latestSequence) sequence.current = message.latestSequence;
           for (const id of scope.current.mounted) connection.sendTerminal(deviceId, {
             type: "attach", sessionId: id, afterSequence: stream.renderedSequence(id),
@@ -196,7 +226,12 @@ export function useWorkspace() {
           if (payload.type === "workspace.updated" && payload.deviceId === deviceId && message.sequence > highWater)
             setWorkspace((old) => payload.workspace.updatedAt >= old.updatedAt ? payload.workspace : old);
           if (payload.type === "history.updated" && payload.deviceId === deviceId) refresh();
-          if (payload.type === "device.updated" && message.sequence > highWater) setDevices((old) => old.map((item) => item.id === payload.device.id ? payload.device : item));
+          if (payload.type === "device.updated" && message.sequence > highWater
+            && (!accountDeviceScope.current || payload.device.id === accountDeviceScope.current)) {
+            pendingDeviceUpdates.add(payload.device.id);
+            setDevices((old) => old.some((item) => item.id === payload.device.id)
+              ? old.map((item) => item.id === payload.device.id ? payload.device : item) : [...old, payload.device]);
+          }
         } else if (message.type === "error") {
           if (message.code === "unauthorized") expire(); else setError(message.code);
         }

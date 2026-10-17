@@ -15,6 +15,8 @@ export function Sidebar({ model, t, onPick, onSettings, onClose, phone }: {
   const [query, setQuery] = useState("");
   const [devices, setDevices] = useState(false);
   const online = model.device?.status === "online";
+  const channel = model.device?.clientKind;
+  const deviceLabel = `${model.device?.name ?? ""}${channel ? ` · ${t(channel)}` : ""}`;
   const canStart = online && model.workspace.projects.length > 0;
   const needle = query.trim().toLowerCase();
   const linkLabel = !online ? t("statusOffline") : model.link === "open" ? t("linkOnline") : t("linkConnecting");
@@ -104,16 +106,18 @@ export function Sidebar({ model, t, onPick, onSettings, onClose, phone }: {
     <footer className="tap-sidebar-foot">
       <button type="button" className="tap-icon" aria-label={t("settings")} title={t("settings")} onClick={onSettings}><Settings size={16} /></button>
       <span className="tap-menu-anchor tap-link-state">
-        <button type="button" className="tap-device" aria-label={`${t("device")}: ${model.device?.name ?? ""}`} aria-haspopup="menu"
-          aria-expanded={devices} disabled={model.devices.length < 2} title={model.devices.length > 1 ? t("chooseDevice") : undefined}
+        <button type="button" className="tap-device" aria-label={`${t("device")}: ${deviceLabel}`} aria-haspopup="menu"
+          aria-expanded={devices} disabled={model.devices.length < 2} title={`${t("chooseDevice")}: ${deviceLabel}`}
           onClick={() => setDevices(!devices)}>
-          <i className={`tap-link${linkClass}`} aria-hidden /><b>{model.device?.name}</b><span aria-hidden>·</span>{linkLabel}
+          <i className={`tap-link${linkClass}`} aria-hidden /><b>{deviceLabel}</b><span aria-hidden>·</span>{linkLabel}
         </button>
         <Menu open={devices} onClose={() => setDevices(false)} label={t("chooseDevice")} placement="up-end">
           {model.devices.map((device) => <button type="button" role="menuitemradio" aria-checked={device.id === model.deviceId} key={device.id}
             onClick={() => { setDevices(false); model.setDeviceId(device.id); }}>
             <i className={`tap-link${device.status === "online" ? "" : " is-lost"}`} aria-hidden />
-            <span>{device.name}</span><small>{device.platform}</small>
+            <span className="tap-device-option"><span>{device.name}</span><small>
+              {device.clientKind ? t(device.clientKind) : device.platform} · {t(device.capabilities.includes("terminal.transcript") ? "chatSupported" : "terminalOnly")}
+            </small></span>
             {device.id === model.deviceId && <Check size={15} className="tap-menu-check" />}
           </button>)}
         </Menu>
