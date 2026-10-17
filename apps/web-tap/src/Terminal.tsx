@@ -14,11 +14,13 @@ import type { TerminalState } from "./useWorkspace";
 import { keyBytes, preparePaste, type Key, type Modifiers } from "./input";
 import { terminalWrites } from "./terminalWrites";
 import { readerLines } from "./format";
+import { nativeCommandPrefix } from "./completion";
 import type { Translate } from "./i18n";
 
 export type TerminalHandle = {
   key: (key: Key, modifiers: Modifiers) => boolean;
   message: (text: string) => Promise<boolean>;
+  command: (prefix: string) => boolean;
   /** Native keyboard input straight into xterm (phones otherwise keep its textarea read-only). */
   focus: () => void;
   leaveDirect: () => void;
@@ -28,6 +30,7 @@ export type TerminalInfo = { size: string; direct: boolean };
 type Props = {
   ref?: Ref<TerminalHandle>; sessionId: string; stream: TerminalStream; active: boolean; visible: boolean;
   connected: boolean; state: TerminalState; fontSize: number; t: Translate;
+  nativeMenu?: boolean;
   onInput: (text: string) => boolean; onResize: (cols: number, rows: number) => void;
   onError: (code: string) => void;
   onRetry: () => void;
@@ -36,7 +39,7 @@ type Props = {
 const DESKTOP_MONO = "ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Cascadia Mono', Consolas, 'Liberation Mono', 'Noto Sans Mono CJK SC', monospace";
 
 /** Independent Tap presentation; the wire frames and grid ownership stay upstream. */
-export function Terminal({ ref, sessionId, stream, active, visible, connected, state, fontSize, t, onInput, onResize, onError, onRetry, onInfo }: Props) {
+export function Terminal({ ref, sessionId, stream, active, visible, connected, state, fontSize, t, onInput, onResize, onError, onRetry, onInfo, nativeMenu = false }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const terminal = useRef<Xterm | null>(null);
   const options = useRef({ active, visible, connected, state, onInput, onResize, onError });
@@ -55,6 +58,8 @@ export function Terminal({ ref, sessionId, stream, active, visible, connected, s
   useEffect(() => { if (!connected || !active) sendVersion.current++; }, [connected, active]);
 
   useImperativeHandle(ref, () => ({
+    command: (prefix) => Boolean(nativeCommandPrefix(prefix) && terminal.current && !broken.current
+      && options.current.connected && options.current.active && options.current.onInput(prefix)),
     key: (key, modifiers) => Boolean(terminal.current && !broken.current && options.current.connected
       && options.current.onInput(keyBytes(key, modifiers, terminal.current.modes.applicationCursorKeysMode))),
     message: async (text) => {
@@ -259,6 +264,26 @@ export function Terminal({ ref, sessionId, stream, active, visible, connected, s
     if (terminal.current) terminal.current.options.fontSize = fontSize;
     relayout.current();
   }, [fontSize, active, visible, state.controlMode, state.cols, state.rows]);
+
+  useEffect(() => {
+    const term = terminal.current, container = host.current;
+    if (!nativeMenu || !active || !visible || !term || !container) return;
+    // A desktop-owned grid can exceed this embedded panel. Reveal its prompt without resizing the PTY.
+    const reveal = () => {
+      const screen = container.querySelector<HTMLElement>(".xterm-screen");
+      if (!screen) return;
+      const row = screen.clientHeight / term.rows, col = screen.clientWidth / term.cols;
+      const top = term.buffer.active.cursorY * row, left = term.buffer.active.cursorX * col;
+      if (top < container.scrollTop || top + row * 8 > container.scrollTop + container.clientHeight)
+        container.scrollTop = Math.max(0, top - Math.max(row * 2, container.clientHeight / 3));
+      if (left < container.scrollLeft || left + col * 2 > container.scrollLeft + container.clientWidth)
+        container.scrollLeft = Math.max(0, left - container.clientWidth / 2);
+    };
+    const rendered = term.onRender(reveal);
+    const resized = new ResizeObserver(reveal); resized.observe(container);
+    reveal();
+    return () => { rendered.dispose(); resized.disconnect(); };
+  }, [nativeMenu, active, visible, sessionId, stream]);
 
   return <div className={`tap-terminal${direct ? " is-direct" : ""}`} aria-label={t("terminal")}>
     {failed && <div className="tap-terminal-failed" role="alert">{t("unavailable")} <button type="button" onClick={onRetry}>{t("reconnect")}</button></div>}

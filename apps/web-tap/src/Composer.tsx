@@ -1,18 +1,24 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import { ArrowUp, ImagePlus, Keyboard, LoaderCircle, Plus, Square } from "lucide-react";
 import { composerAction, modifyCharacter, type Modifiers } from "./input";
 import { Menu } from "./Menu";
 import { fill, type Translate } from "./i18n";
+import { DRAFT_LIMIT, nativeCommandPrefix } from "./completion";
+import { useComposerCompletion, type CompletionContext } from "./useComposerCompletion";
+import { ComposerCompletion } from "./ComposerCompletion";
 
 /** Draft ownership is per account/device/session, independent of selected display mode. */
 export function Composer({ storageKey, disabled, blocked, phone, cli, modifiers, clearModifiers, onPresence,
-  onCharacter, onSend, onInterrupt, onDirect, onImage, t }: {
+  onCharacter, onSend, onInterrupt, onDirect, onImage, onCommand, completion, t }: {
   storageKey: string; disabled: boolean; blocked?: string; phone: boolean; cli: string;
   modifiers: Modifiers; clearModifiers: () => void;
   /** Focus and draft presence; the key strip steps aside while a message is being written. */
   onPresence?: (focused: boolean, drafting: boolean) => void;
   onCharacter: (bytes: string) => boolean; onSend: (text: string) => Promise<boolean>;
   onInterrupt: () => void; onDirect: () => void; onImage: (file: File) => Promise<string>; t: Translate;
+  completion?: CompletionContext;
+  /** Hand a command prefix to the live CLI without submitting it. */
+  onCommand?: (text: string) => boolean;
 }) {
   const [draft, setDraft] = useState(() => { try { return localStorage.getItem(storageKey) ?? ""; } catch { return ""; } });
   const [sending, setSending] = useState(false);
@@ -21,6 +27,9 @@ export function Composer({ storageKey, disabled, blocked, phone, cli, modifiers,
   const input = useRef<HTMLTextAreaElement>(null);
   const image = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
+  const [ime, setIme] = useState(false);
+  const [caret, setCaret] = useState<[number, number]>([draft.length, draft.length]);
+  const pendingCaret = useRef<number | undefined>(undefined);
   const busy = useRef(false);
   const mounted = useRef(true);
   const draftRef = useRef(draft);
@@ -51,27 +60,59 @@ export function Composer({ storageKey, disabled, blocked, phone, cli, modifiers,
   const keepFocus = (event: PointerEvent) => event.preventDefault();
   const placeholder = blocked ?? fill(t("nextStep"), { agent: cli }) + (phone ? "" : t("desktopHint"));
   const [focused, setFocused] = useState(false);
+  const menu = useComposerCompletion({ context: completion, scope: storageKey, text: draft, caret,
+    enabled: focused && !disabled && !sending && !ime && !adding,
+    onReplace: (text, position) => { pendingCaret.current = position; setDraft(text); setCaret([position, position]); },
+  });
+  useLayoutEffect(() => {
+    if (pendingCaret.current === undefined) return;
+    input.current?.focus();
+    input.current?.setSelectionRange(pendingCaret.current, pendingCaret.current);
+    pendingCaret.current = undefined;
+  }, [draft, caret]);
   const presence = useRef(onPresence);
   presence.current = onPresence;
   useEffect(() => { presence.current?.(focused, Boolean(draft)); }, [focused, draft]);
-  return <div className="tap-composer-wrap">
+  return <div className="tap-composer-wrap" onBlurCapture={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
+  }}>
+    <ComposerCompletion menu={menu} t={t} />
     {error && <div className="tap-inline-error" role="alert"><span>{error}</span>
       <button type="button" onClick={() => setError("")}>{t("close")}</button></div>}
     <div className={`tap-composer${disabled ? " is-disabled" : ""}`}>
-      <textarea ref={input} value={draft} maxLength={16_000} rows={1} aria-label={t("input")}
+      <textarea ref={input} value={draft} maxLength={DRAFT_LIMIT} rows={1} aria-label={t("input")}
+        role={completion?.enabled ? "combobox" : undefined} aria-autocomplete={completion?.enabled ? "list" : undefined}
+        aria-expanded={completion?.enabled ? menu.open : undefined} aria-controls={menu.open ? menu.id : undefined}
+        aria-activedescendant={menu.open && menu.items[menu.index] ? `${menu.id}-${menu.index}` : undefined}
         placeholder={placeholder} enterKeyHint={phone ? "enter" : "send"}
-        onChange={(event) => setDraft(event.target.value)}
-        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
+        onChange={(event) => {
+          const { value, selectionStart, selectionEnd } = event.target;
+          if (completion?.enabled && ["claude", "codex"].includes(completion.source) && onCommand
+            && !disabled && !busy.current && !composing.current && !modifiers.ctrl && !modifiers.alt
+            && selectionStart === value.length && selectionEnd === value.length && nativeCommandPrefix(value)) {
+            if (onCommand(value)) { setDraft(""); setCaret([0, 0]); setError(""); return; }
+            setError(t("sendFailed"));
+          }
+          setDraft(value); setCaret([selectionStart, selectionEnd]);
+        }}
+        onSelect={(event) => setCaret([event.currentTarget.selectionStart, event.currentTarget.selectionEnd])}
+        onFocus={() => setFocused(true)}
+        onCompositionStart={() => { composing.current = true; setIme(true); }}
+        onCompositionEnd={(event) => {
+          composing.current = false; setIme(false); setCaret([event.currentTarget.selectionStart, event.currentTarget.selectionEnd]);
+        }}
         onKeyDown={(event) => {
           if (composing.current || event.nativeEvent.isComposing || event.keyCode === 229) return;
+          if (event.key === "Enter" && event.repeat) { event.preventDefault(); return; }
           if ((modifiers.ctrl || modifiers.alt) && event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
             event.preventDefault();
             if (onCharacter(modifyCharacter(event.key, modifiers))) clearModifiers();
             return;
           }
+          if (menu.key(event)) { event.preventDefault(); event.stopPropagation(); return; }
           if (composerAction(event, phone) === "send") { event.preventDefault(); void send(); }
         }} />
+      {completion?.enabled && <p className="tap-completion-hint">{t("completionHint")}</p>}
       <div className="tap-composer-row">
         <div className="tap-composer-tools">
           <span className="tap-menu-anchor">

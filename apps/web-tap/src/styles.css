@@ -1,5 +1,6 @@
 /* Tap workspace: quiet neutral surfaces, violet interaction states, native dark terminal. */
 @import "./session.css";
+@import "./completion.css";
 @import "./panels.css";
 
 @font-face {

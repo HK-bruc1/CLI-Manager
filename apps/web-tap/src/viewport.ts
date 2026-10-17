@@ -32,7 +32,10 @@ function paintViewport() {
   if (!view.open) dismissUntil = 0;
   const keyboardOpen = view.open && Date.now() >= dismissUntil;
   const lift = keyboardOpen ? view.keyboard + Math.max(0, inset - 6) : 0;
-  for (const root of roots) root.style.top = lift ? `${-lift}px` : "";
+  for (const root of roots) {
+    root.style.top = lift ? `${-lift}px` : "";
+    root.style.setProperty("--vv-height", `${view.height}px`);
+  }
   document.documentElement.dataset.keyboard = keyboardOpen ? "open" : "closed";
   if (overlay) {
     overlay.style.setProperty("--vv-top", `${view.top}px`);
