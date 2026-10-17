@@ -5,7 +5,8 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "apps/web-tap"
   ],
   "scripts": {
     "check:architecture": "node ./scripts/architecture.mjs",
@@ -18,7 +19,11 @@
     "tauri:clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
     "preview": "vite preview",
     "web:dev": "npm run dev --workspace @cli-manager/web",
-    "web:build": "npm run build --workspace @cli-manager/web",
+    "web:build": "npm run build --workspace @cli-manager/web && npm run tap:build",
+    "tap:dev": "npm run dev --workspace @cli-manager/web-tap",
+    "tap:build": "npm run build --workspace @cli-manager/web-tap",
+    "tap:typecheck": "npm run typecheck --workspace @cli-manager/web-tap",
+    "tap:test": "npm run test --workspace @cli-manager/web-tap",
     "web:typecheck": "npm run typecheck --workspace @cli-manager/web",
     "web:server:check": "cargo check --manifest-path apps/server/Cargo.toml",
     "web:server:test": "cargo test --manifest-path apps/server/Cargo.toml",

@@ -75,7 +75,8 @@
       "resources/conpty/arm64/*": "resources/conpty/arm64",
       "resources/ssh-agent/**/*": "resources/ssh-agent",
       "../apps/web/dist/index.html": "apps/web/dist/index.html",
-      "../apps/web/dist/assets/**/*": "apps/web/dist/assets"
+      "../apps/web/dist/assets/**/*": "apps/web/dist/assets",
+      "../apps/web/dist/tap/**/*": "apps/web/dist/tap"
     },
     "icon": [
       "icons/32x32.png",

@@ -33,13 +33,13 @@ $executableNames = @(
 )
 $resourcesDir = Join-Path $resolvedSourceDir "resources"
 $webDistDir = Join-Path $resolvedSourceDir "apps/web/dist"
-foreach ($relativePath in ($executableNames + @("apps/web/dist/index.html"))) {
+foreach ($relativePath in ($executableNames + @("apps/web/dist/index.html", "apps/web/dist/tap/index.html"))) {
     $requiredPath = Join-Path $resolvedSourceDir $relativePath
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
         throw "Missing portable package input: $requiredPath"
     }
 }
-foreach ($requiredPath in @($resourcesDir, (Join-Path $webDistDir "assets"))) {
+foreach ($requiredPath in @($resourcesDir, (Join-Path $webDistDir "assets"), (Join-Path $webDistDir "tap/assets"))) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Container)) {
         throw "Missing portable package input: $requiredPath"
     }
