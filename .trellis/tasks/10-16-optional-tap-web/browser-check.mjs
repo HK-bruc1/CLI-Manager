@@ -146,6 +146,8 @@ let browser;
 try {
   browser = await chromium.launch({ headless: true, executablePath: process.env.TAP_CHROMIUM, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  // Desktop hides the key strip by default; this run drives it, as a phone would.
+  await page.addInitScript(() => { if (!localStorage.getItem("cli-manager.tap.preferences")) localStorage.setItem("cli-manager.tap.preferences", JSON.stringify({ keys: true })); });
   const errors = []; page.on("pageerror", (error) => errors.push(String(error)));
   await page.goto(`${base}/tap/`);
   await page.getByLabel("用户名", { exact: true }).fill("reviewer");
@@ -160,7 +162,7 @@ try {
   await input.fill("reconnect this draft");
   await page.reload();
   await input.waitFor();
-  assert.equal(await page.locator(".tap-nav-session[aria-current=page]").innerText(), "检查会话接力");
+  assert.equal(await page.locator(".tap-nav-row[aria-current=page]").innerText(), "检查会话接力");
   assert.equal(await input.inputValue(), "reconnect this draft");
   // Keep a deep link from initial load, then select another session before reconnect.
   await page.getByRole("button", { name: "完善移动工作台", exact: true }).click();
@@ -170,7 +172,7 @@ try {
   await page.getByRole("button", { name: "重新连接", exact: true }).click();
   await input.waitFor();
   await page.waitForTimeout(350);
-  assert.equal(await page.locator(".tap-nav-session[aria-current=page]").innerText(), "完善移动工作台");
+  assert.equal(await page.locator(".tap-nav-row[aria-current=page]").innerText(), "完善移动工作台");
   assert.equal(await input.inputValue(), "keep this draft");
   assert.equal(inputLog.length, inputBeforeReconnect);
   await input.fill("任务一\n任务二");
@@ -192,19 +194,27 @@ try {
   await page.waitForTimeout(200); assert.equal(inputLog.at(-1).data, "\r");
   assert.equal(await input.inputValue(), "");
   await page.screenshot({ path: path.join(evidence, "desktop-chat.png"), fullPage: true });
-  await page.getByRole("button", { name: "查看项目详情", exact: true }).click();
+  await page.getByRole("button", { name: "打开右侧栏（详情、改动、文件）", exact: true }).click();
+  await page.getByRole("tab", { name: "文件", exact: true }).click();
   await page.getByRole("button", { name: "README.md", exact: true }).click();
   await page.getByText("Controlled fixture content.", { exact: false }).waitFor();
-  await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();
-  await page.getByRole("button", { name: "显示设置", exact: true }).last().click();
-  await page.getByRole("combobox", { name: "外观", exact: true }).selectOption("dark");
-  await page.getByRole("combobox", { name: "语言", exact: true }).selectOption("en-US");
+  await page.getByRole("button", { name: "收起右侧栏", exact: true }).last().click();
+  const settings = async (more, item) => {
+    await page.locator(".tap-session.is-visible").getByRole("button", { name: more, exact: true }).click();
+    await page.getByRole("menuitem", { name: item, exact: true }).click();
+  };
+  await settings("更多操作", "设置");
+  await page.getByRole("radio", { name: "深色", exact: true }).click();
+  await page.getByRole("radio", { name: "English", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+  await page.waitForTimeout(250);
   assert.equal(await page.locator("html").getAttribute("lang"), "en-US");
-  await page.getByRole("button", { name: "Display settings", exact: true }).last().click();
-  await page.getByRole("combobox", { name: "Language", exact: true }).selectOption("zh-CN");
-  await page.getByRole("combobox", { name: "外观", exact: true }).selectOption("light");
+  assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
+  await settings("More actions", "Settings");
+  await page.getByRole("radio", { name: "简体中文", exact: true }).click();
+  await page.getByRole("radio", { name: "浅色", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();
+  await page.waitForTimeout(250);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("tab", { name: "终端", exact: true }).click();
   await page.locator(".tap-terminal-reader:not([hidden])").waitFor();
@@ -247,9 +257,11 @@ try {
     return { lifted, stable, reset };
   });
   assert.deepEqual(viewportCheck, { lifted: "-280px", stable: true, reset: "" });
-  await page.getByRole("button", { name: "结束会话", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "取消", exact: true }).click();
-  // Repeating native keys stop immediately on cancellation.
+  await page.locator(".tap-session.is-visible").getByRole("button", { name: "更多操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "结束会话…", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "取消", exact: true }).click();
+  // Repeating native keys stop immediately on cancellation; the key strip belongs to the terminal view.
+  await page.getByRole("tab", { name: "终端", exact: true }).click();
   const up = page.getByRole("button", { name: "上", exact: true });
   const upBox = await up.boundingBox();
   await page.mouse.move(upBox.x + upBox.width / 2, upBox.y + upBox.height / 2);
@@ -263,10 +275,12 @@ try {
   await page.getByRole("button", { name: "打开会话导航", exact: true }).click();
   await page.getByRole("button", { name: "新建会话 · Design notes", exact: true }).click();
   await page.waitForFunction(() => location.hash.startsWith("#/s/pty-created-"));
-  assert.equal(requestLog.at(-1).kind, "project.start");
+  // Status reads (Git branch, transcript) may follow; the last command is still the native start.
+  assert.equal(requestLog.filter((request) => !["git.status", "file.list", "terminal.transcript"].includes(request.kind)).at(-1).kind, "project.start");
   await input.fill("device-a private draft");
   await page.getByRole("button", { name: "打开会话导航", exact: true }).click();
-  await page.getByRole("combobox", { name: "执行设备", exact: true }).selectOption("device-b");
+  await page.getByRole("button", { name: /^执行设备/ }).click();
+  await page.getByRole("menuitemradio", { name: /Spare host/ }).click();
   await page.keyboard.press("Escape");
   await page.waitForTimeout(350);
   assert.notEqual(await input.inputValue().catch(() => ""), "device-a private draft");
@@ -277,18 +291,17 @@ try {
   await page.getByRole("button", { name: "确认连接", exact: true }).click();
   await page.waitForFunction(() => Boolean(document.querySelector(".tap-app")));
   assert.equal(redeems, 1);
-  assert.equal(await page.getByRole("combobox", { name: "执行设备", exact: true }).count(), 0, "phone navigation remains closed");
-  await page.getByRole("button", { name: "打开会话导航", exact: true }).click();
-  assert.equal(await page.getByRole("combobox", { name: "执行设备", exact: true }).locator("option").count(), 1);
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "显示设置", exact: true }).last().click();
+  assert.equal(await page.locator(".tap-drawer.is-left.is-open").count(), 0, "phone navigation remains closed");
+  await page.getByRole("button", { name: "打开会话导航", exact: true }).first().click();
+  assert.equal(await page.getByRole("button", { name: /^执行设备/ }).isDisabled(), true, "a scoped ticket offers one device");
+  await page.getByRole("button", { name: "设置", exact: true }).first().click();
   await page.getByRole("button", { name: "退出登录", exact: true }).click();
   await page.getByRole("button", { name: "登录", exact: true }).waitFor();
   assert.equal(await page.locator(".tap-terminal-screen").count(), 0);
   await page.getByLabel("用户名", { exact: true }).fill("reviewer");
   await page.getByLabel("密码", { exact: true }).fill("fixture-only");
   await page.getByRole("button", { name: "登录", exact: true }).click();
-  await page.getByRole("button", { name: "打开会话导航", exact: true }).waitFor();
+  await page.getByRole("button", { name: "打开会话导航", exact: true }).first().waitFor();
   for (const socket of clients) socket.close(4401, "expired");
   await page.getByRole("button", { name: "登录", exact: true }).waitFor();
   assert.equal(await page.locator(".tap-terminal-screen").count(), 0);
@@ -337,10 +350,19 @@ try {
   // A late project launch must not retarget an already-open process-close confirmation.
   holdStart = true;
   await page.getByRole("button", { name: "新建会话 · Design notes", exact: true }).click();
-  await page.getByRole("button", { name: "结束会话", exact: true }).click();
+  await page.locator(".tap-session.is-visible").getByRole("button", { name: "更多操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "结束会话…", exact: true }).click();
+  await page.getByRole("alertdialog").waitFor();
+  const closesBefore = commandLog.filter((message) => message.command?.type === "close").length;
   assert.equal(typeof finishStart, "function"); finishStart();
   await page.waitForFunction(() => location.hash.startsWith("#/s/pty-created-"));
-  await page.getByRole("dialog").getByRole("button", { name: "结束会话", exact: true }).click();
+  await page.waitForTimeout(100);
+  assert.equal(await page.getByRole("alertdialog").count(), 0, "switching sessions dismisses the confirmation instead of retargeting it");
+  assert.equal(commandLog.filter((message) => message.command?.type === "close").length, closesBefore);
+  await page.getByRole("button", { name: "完善移动工作台", exact: true }).click();
+  await page.locator(".tap-session.is-visible").getByRole("button", { name: "更多操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "结束会话…", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "结束进程", exact: true }).click();
   await page.waitForTimeout(100);
   assert.equal(commandLog.findLast((message) => message.command?.type === "close").command.sessionId, "pty-a");
   // Canceling a ticket must restore the old native screen, not only its empty renderer.
@@ -358,7 +380,8 @@ try {
     }
     if (!window.tapOldModel) throw Error("workspace model unavailable");
   });
-  await page.getByRole("combobox", { name: "执行设备", exact: true }).selectOption("device-b");
+  await page.getByRole("button", { name: /^执行设备/ }).click();
+  await page.getByRole("menuitemradio", { name: /Spare host/ }).click();
   await page.waitForTimeout(350);
   const commandsBeforeStale = commandLog.length;
   const acceptedStale = await page.evaluate(() => {
@@ -371,7 +394,7 @@ try {
   assert.equal(acceptedStale, false, "old-scope input must be rejected before sending");
   assert.equal(commandLog.length, commandsBeforeStale, "old resize/close must not target a new device");
   // Escape belongs to an IME candidate/child control before the surrounding sheet.
-  await page.getByRole("button", { name: "显示设置", exact: true }).last().click();
+  await page.getByRole("button", { name: "设置", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   await dialog.dispatchEvent("keydown", { key: "Escape", isComposing: true });
   assert.equal(await dialog.isVisible(), true, "IME Escape must not dismiss the sheet");
@@ -444,22 +467,24 @@ try {
   await phone.getByRole("button", { name: "打开会话导航", exact: true }).click();
   await phone.getByRole("button", { name: "完善移动工作台", exact: true }).click();
   await phone.locator(".tap-session.is-visible .xterm-helper-textarea").waitFor({ state: "attached" });
-  const direct = phone.locator(".tap-session.is-visible .tap-terminal-meta button").last();
-  await direct.click();
+  await phone.locator(".tap-session.is-visible").getByRole("button", { name: "添加", exact: true }).click();
+  await phone.getByRole("menuitem", { name: "直接键入", exact: true }).click();
   assert.equal(await phone.locator(".tap-session.is-visible .xterm-helper-textarea").evaluate((element) => element.readOnly), false);
-  await direct.click();
+  await phone.getByRole("button", { name: "结束直接键入", exact: true }).click();
   assert.equal(await phone.locator(".tap-session.is-visible .xterm-helper-textarea").evaluate((element) => element.readOnly), true, "leaving direct input restores the coarse-pointer keyboard policy");
   assert.deepEqual(phoneErrors, [], "optional font failure must not reject the terminal setup");
   await phone.close();
   // An aborted old 401 body must not expire the new device/account scope.
-  await page.getByRole("combobox", { name: "执行设备", exact: true }).selectOption("device-a");
+  await page.getByRole("button", { name: /^执行设备/ }).click();
+  await page.getByRole("menuitemradio", { name: /Studio/ }).click();
   await page.waitForTimeout(350);
   holdHistory401 = true;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   const historyDeadline = Date.now() + 3000;
   while (!finishHistory401 && Date.now() < historyDeadline) await page.waitForTimeout(10);
   assert.equal(typeof finishHistory401, "function");
-  await page.getByRole("combobox", { name: "执行设备", exact: true }).selectOption("device-b");
+  await page.getByRole("button", { name: /^执行设备/ }).click();
+  await page.getByRole("menuitemradio", { name: /Spare host/ }).click();
   await page.waitForTimeout(350);
   finishHistory401();
   assert.equal(await page.locator(".tap-app").count(), 1, "an old response must not expire the new scope");

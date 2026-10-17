@@ -103,3 +103,26 @@ Tap-Code's interaction experience is the reference, not a license grant. This pa
 The user explicitly approved the two-commit plan, branch push and Draft PR, conditional on detailed pre-submit review. Review and regression gates are now satisfied for Draft submission: commit shared extraction, then optional client/host/docs, push only `feat/optional-tap-web` to the verified `nnnmdzz/CLI-Manager` fork and create the Draft against `dark-hxx/CLI-Manager:master`. Keep this task/worktree available for the unverified platform/clean-install acceptance and upstream review; do not archive it as fully accepted, merge or deploy automatically.
 
 Submitted [Draft PR #287](https://github.com/dark-hxx/CLI-Manager/pull/287). Approved code commits: `579a17d` (shared extraction), `0c954db` (optional client). GitHub reports OPEN, `isDraft=true`, base `master`, head `nnnmdzz:feat/optional-tap-web`; remote SHA matches the feature commit. No checks were reported in `statusCheckRollup` at submission, so the passing checks above are local evidence, not a GitHub CI result. Session/task bookkeeping follows separately without changing implementation. Original Tap-Code remains at `1a3d946`, with only the three earlier untracked analysis documents; none was included in this PR.
+
+## UI and interaction alignment round (2026-10-16)
+
+The user asked to review the Tap Web UI/interaction against the current Tap-Code (`1a3d946`) and improve the experience. Tap-Code's phone and desktop screens were captured from its private preview with fake CLIs and compared side by side with this client against a deterministic protocol fixture; behavior was re-implemented here, no Tap-Code source files or icons were copied.
+
+| Area | Change |
+|---|---|
+| Topbar | Per-session header: status glyph, title, connection dot, `project · cli · cols×rows` on phones; segmented chat/terminal toggle remembered per device (touch → chat, desktop → terminal); desktop crumb and +N −M side-panel chip; ⋯ menu with terminal font stepper, settings and an inline, session-bound end confirmation. Stop/settings no longer sit as one-tap topbar icons. |
+| Dock | Key strip moved above the composer, terminal view only (touch default, settings switch) and hidden while writing; composer "+" menu (image, type directly), labelled interrupt (Esc for Claude Code/Codex), round send; status row with size, project, branch, +N −M only. |
+| Navigation | Sidebar with search, CLI brand icons from the shared `CliToolIcon`, running counts, mounted-session marks, worktree badges, device menu instead of a native select. Phone drawers open from the screen edges and close by dragging. |
+| Panels | Side panel (Details / Changes / Files) docks at ≥1152px, floats otherwise, slides from the right on phones; Git letters, read-only diff and file preview with a back header. Git status is shared per project context, read on activation/visibility/after sending, never polled. |
+| Conversation | Turns group interim replies into one fold row, footer with copy and 24-hour time, clamped long prompts, jump-to-latest with unread dot, notices with an "open terminal" action. |
+| Overlays | No `inert`/`showModal()`; overlay stack handles Escape/Tab/focus restore; menus and sheets animate in and out; settings use theme tiles, segmented control, steppers and a switch. |
+
+| Check | Result |
+|---|---|
+| `npm run web:typecheck`, `npm run tap:typecheck`, `npm run web:build` | Passed |
+| `npm run tap:test` | Passed, 14 tests (new `format.test.mjs`: model names, 24-hour footers, reading-view rules, turn grouping) |
+| `browser-check.mjs` (selectors updated for the new UI; key strip asserted in terminal view; end confirmation is now dismissed instead of retargeted when another session takes focus) | `pass`, 5001 frames batched into 3 writes |
+| Phone gestures (CDP touch): left/right edge swipe opens, drag closes | Passed |
+| `npm run check:architecture -- --strict`, `git diff --check` | Passed (1391 files, none above 2000 lines) |
+
+Still pending as before: Windows/WSL real CLI binding, real iOS/Android keyboards and touch, installer/portable launch.

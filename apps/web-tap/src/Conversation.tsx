@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Copy, Check } from "lucide-react";
+import { ArrowDown, Check, ChevronRight, Copy, LoaderCircle, MessageSquareDashed, SquareTerminal } from "lucide-react";
 import type { JsonObject, JsonValue, TerminalStream, TerminalTranscript, TranscriptMessage } from "./protocol";
-import type { Translate } from "./i18n";
+import { fill, type Translate } from "./i18n";
+import { clock, duration, modelName } from "./format";
+import { groupTurns, type Turn } from "./turns";
 
 /** Update visible history in response to output; idle/hidden chats never poll continuously. */
-export function Conversation({ sessionId, context, run, stream, active, supported, t }: {
+export function Conversation({ sessionId, context, run, stream, active, supported, chatSize, onTerminal, t }: {
   sessionId: string; context: JsonObject; run: (kind: string, payload: JsonObject) => Promise<JsonValue>;
-  stream: TerminalStream; active: boolean; supported: boolean; t: Translate;
+  stream: TerminalStream; active: boolean; supported: boolean; chatSize: number; onTerminal: () => void; t: Translate;
 }) {
   const [page, setPage] = useState<TerminalTranscript>();
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
@@ -16,6 +18,11 @@ export function Conversation({ sessionId, context, run, stream, active, supporte
   const [error, setError] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
+  const [away, setAway] = useState(false);
+  const [unread, setUnread] = useState(false);
+  const [flowing, setFlowing] = useState(false);
+  const flowTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const turns = useMemo(() => groupTurns(messages), [messages]);
   const reading = useRef<{ height: number; top: number } | undefined>(undefined);
   const binding = useRef<string | undefined>(undefined);
   const busy = useRef(false);
@@ -61,6 +68,9 @@ export function Conversation({ sessionId, context, run, stream, active, supporte
     alive.current = true;
     if (active) void load();
     const schedule = () => {
+      setFlowing(true);
+      clearTimeout(flowTimer.current);
+      flowTimer.current = setTimeout(() => setFlowing(false), 4000);
       if (!options.current.active || document.visibilityState === "hidden" || timer.current) return;
       timer.current = setTimeout(() => { timer.current = undefined; void load(); }, 2000);
     };
@@ -76,35 +86,91 @@ export function Conversation({ sessionId, context, run, stream, active, supporte
       box.current.scrollTop = reading.current.top + box.current.scrollHeight - reading.current.height;
       reading.current = undefined;
     } else if (pinned.current) box.current.scrollTop = box.current.scrollHeight;
+    else setUnread(true);
   }, [messages]);
+  useEffect(() => () => clearTimeout(flowTimer.current), []);
+  const bottom = () => { if (box.current) box.current.scrollTop = box.current.scrollHeight; setUnread(false); };
 
-  return <div className="tap-chat" ref={box} onScroll={() => {
-    if (box.current) pinned.current = box.current.scrollHeight - box.current.clientHeight - box.current.scrollTop < 48;
-  }}>
-    {!supported ? <p className="tap-chat-notice">{t("noChat")}</p>
-      : page?.available === false ? <p className="tap-chat-notice">{t(page.reason ?? "missing")}</p> : null}
-    {supported && page && page.start > 0 && <button className="tap-load-older" disabled={loading} onClick={() => void load(page.start)}>{t("older")}</button>}
-    {error && <div className="tap-inline-error" role="alert">{t("error")} <button onClick={() => void load()}>{t("retry")}</button></div>}
-    {loading && !page && <p className="tap-chat-notice" role="status">{t("loading")}</p>}
-    {page?.available && !messages.length && <p className="tap-chat-notice">{t("chatEmpty")}</p>}
-    <div className="tap-chat-content">
-      {messages.map((message) => <Message key={message.id} message={message} t={t} />)}
+  const notice = !supported ? "noChat" : page?.available === false ? page.reason ?? "missing" : undefined;
+  return <div className="tap-chat-wrap" style={{ "--chat-text": `${chatSize}px` } as CSSProperties}>
+    <div className="tap-chat" ref={box} onScroll={() => {
+      const element = box.current;
+      if (!element) return;
+      pinned.current = element.scrollHeight - element.clientHeight - element.scrollTop < 48;
+      setAway(!pinned.current);
+      if (pinned.current) setUnread(false);
+    }}>
+      <div className="tap-chat-column">
+        {supported && page && page.start > 0 && <div className="tap-load-older">
+          {loading ? <LoaderCircle size={15} className="tap-spin" aria-label={t("loading")} />
+            : <button type="button" onClick={() => void load(page.start)}>{t("older")}</button>}
+        </div>}
+        {notice && <div className="tap-chat-notice"><MessageSquareDashed size={14} /><p>{t(notice as "noChat")}</p>
+          <button type="button" className="tap-text-button" onClick={onTerminal}><SquareTerminal size={14} />{t("openTerminal")}</button>
+        </div>}
+        {error && <div className="tap-chat-notice is-error" role="alert"><p>{t("error")}</p>
+          <button type="button" className="tap-text-button" onClick={() => void load()}>{t("retry")}</button></div>}
+        {loading && !page && <p className="tap-chat-empty" role="status">{t("loading")}</p>}
+        {page?.available && !messages.length && <p className="tap-chat-empty">{t("chatEmpty")}</p>}
+        <ol className="tap-chat-list">
+          {turns.map((turn, index) => <TurnView key={turn.key} turn={turn} live={flowing && index === turns.length - 1} t={t} />)}
+        </ol>
+      </div>
     </div>
+    {away && <button type="button" className="tap-jump" aria-label={t("jumpLatest")} title={t("jumpLatest")} onClick={bottom}>
+      <ArrowDown size={17} />{unread && <i aria-hidden />}
+    </button>}
+  </div>;
+}
+
+/** Interim replies fold into one row once the turn is done; the final answer stays open. */
+function TurnView({ turn, live, t }: { turn: Turn; live: boolean; t: Translate }) {
+  const [open, setOpen] = useState(false);
+  const steps = turn.steps.length;
+  const model = modelName(turn.answer?.model ?? turn.steps.at(-1)?.model);
+  const label = turn.elapsed !== undefined ? fill(t("workedFor"), { time: duration(turn.elapsed) })
+    : steps ? fill(t("interimReplies"), { n: steps }) : "";
+  const expanded = open || live;
+  return <li className="tap-turn">
+    {turn.prompt && <UserBubble message={turn.prompt} t={t} />}
+    {(steps > 0 || (label && model)) && <button type="button" className="tap-fold" aria-expanded={expanded}
+      disabled={!steps} onClick={() => setOpen(!open)}>
+      {steps > 0 && <ChevronRight size={13} className={expanded ? "is-open" : undefined} />}
+      {model && <span className="tap-fold-model">{model}</span>}<span>{label}</span>
+    </button>}
+    {expanded && turn.steps.map((message) => <Message key={message.id} message={message} t={t} />)}
+    {turn.answer && <Message message={turn.answer} t={t} />}
+    {turn.answer && <Footer message={turn.answer} t={t} />}
+  </li>;
+}
+
+function UserBubble({ message, t }: { message: TranscriptMessage; t: Translate }) {
+  const long = message.text.length > 900 || message.text.split("\n").length > 12;
+  const [open, setOpen] = useState(false);
+  return <div className="tap-user">
+    <div className={`tap-bubble${long && !open ? " is-clamped" : ""}`}>{message.text}</div>
+    {long && <button type="button" className="tap-bubble-more" onClick={() => setOpen(!open)}>{t(open ? "collapse" : "expand")}</button>}
   </div>;
 }
 
 /** Message HTML remains escaped; links can only navigate through Markdown's safe URL handling. */
 function Message({ message, t }: { message: TranscriptMessage; t: Translate }) {
-  const [copied, setCopied] = useState(false);
-  return <article className={`tap-message is-${message.role}`}>
-    <Markdown remarkPlugins={[remarkGfm]} components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{message.text}</Markdown>
-    {message.truncated && <small>{t("truncated")}</small>}
-    {message.role === "assistant" && <footer>
-      <button onClick={() => { void navigator.clipboard.writeText(message.text).then(() => setCopied(true), () => {}); }}>
-        {copied ? <Check size={13} /> : <Copy size={13} />}{t(copied ? "copied" : "copy")}
-      </button>
-      <span>{message.model}</span>
-      {message.at && <time>{new Date(message.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}</time>}
-    </footer>}
+  return <article className="tap-message">
+    <Markdown remarkPlugins={[remarkGfm]} components={{
+      a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
+      table: ({ children }) => <div className="tap-table"><table>{children}</table></div>,
+    }}>{message.text}</Markdown>
+    {message.truncated && <small className="tap-truncated">{t("truncated")}</small>}
   </article>;
+}
+
+function Footer({ message, t }: { message: TranscriptMessage; t: Translate }) {
+  const [copied, setCopied] = useState(false);
+  const time = clock(message.at);
+  return <footer className="tap-turn-foot">
+    <button type="button" aria-label={t(copied ? "copied" : "copy")} title={t(copied ? "copied" : "copy")} onClick={() => {
+      void navigator.clipboard.writeText(message.text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {});
+    }}>{copied ? <Check size={13} /> : <Copy size={13} />}</button>
+    {time && <span className="tap-meta">{time}</span>}
+  </footer>;
 }

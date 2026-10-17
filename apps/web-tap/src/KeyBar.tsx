@@ -8,7 +8,7 @@ const rows: (Key | "ctrl" | "alt")[][] = [
   ["tab", "ctrl", "alt", "left", "down", "right", "enter"],
 ];
 const labels: Record<Key | "ctrl" | "alt", TextKey> = {
-  esc: "escape", backtab: "shiftTab", interrupt: "interrupt", slash: "input", up: "up", down: "down", left: "left", right: "right",
+  esc: "escape", backtab: "shiftTab", interrupt: "interrupt", slash: "slash", up: "up", down: "down", left: "left", right: "right",
   pageup: "pageup", pagedown: "pagedown", tab: "tab", enter: "enter", ctrl: "ctrl", alt: "alt",
 };
 const icons = { up: ArrowUp, down: ArrowDown, left: ArrowLeft, right: ArrowRight, enter: CornerDownLeft };
@@ -32,7 +32,9 @@ export function KeyBar({ disabled, modifiers, onModifiers, onKey, t }: {
     {rows.map((row, index) => <div className="tap-keyrow" key={index}>
       {row.map((key) => {
         const Icon = key in icons ? icons[key as keyof typeof icons] : undefined;
+        const latched = (key === "ctrl" || key === "alt") && modifiers[key];
         return <button key={key} type="button" disabled={disabled}
+          className={`tap-keycap${key === "enter" ? " is-enter" : ""}${latched ? " is-latched" : ""}`}
           aria-label={t(labels[key])} aria-pressed={key === "ctrl" || key === "alt" ? modifiers[key] : undefined}
           onPointerDown={(event) => {
             if (event.button !== 0) return;
@@ -44,7 +46,7 @@ export function KeyBar({ disabled, modifiers, onModifiers, onKey, t }: {
           }} onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}
           onContextMenu={(event) => event.preventDefault()}
           onClick={(event) => { if (event.detail === 0) press(key); }}>
-          {Icon ? <Icon size={16} aria-hidden /> : key === "interrupt" ? "^C" : key === "slash" ? "/"
+          {Icon ? <Icon size={15} strokeWidth={1.9} aria-hidden /> : key === "interrupt" ? "^C" : key === "slash" ? "/"
             : key === "backtab" ? "⇧ Tab" : key === "pageup" ? "PgUp" : key === "pagedown" ? "PgDn" : key === "esc" ? "Esc"
               : key.charAt(0).toUpperCase() + key.slice(1)}
         </button>;

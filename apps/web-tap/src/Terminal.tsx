@@ -1,4 +1,5 @@
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import { BookOpenText, Keyboard, MonitorUp } from "lucide-react";
 import { flushSync } from "react-dom";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -12,23 +13,30 @@ import type { TerminalStream } from "./protocol";
 import type { TerminalState } from "./useWorkspace";
 import { keyBytes, preparePaste, type Key, type Modifiers } from "./input";
 import { terminalWrites } from "./terminalWrites";
+import { readerLines } from "./format";
 import type { Translate } from "./i18n";
 
 export type TerminalHandle = {
   key: (key: Key, modifiers: Modifiers) => boolean;
   message: (text: string) => Promise<boolean>;
+  /** Native keyboard input straight into xterm (phones otherwise keep its textarea read-only). */
   focus: () => void;
+  leaveDirect: () => void;
 };
+/** What the session header and dock show about this renderer. */
+export type TerminalInfo = { size: string; direct: boolean };
 type Props = {
   ref?: Ref<TerminalHandle>; sessionId: string; stream: TerminalStream; active: boolean; visible: boolean;
   connected: boolean; state: TerminalState; fontSize: number; t: Translate;
   onInput: (text: string) => boolean; onResize: (cols: number, rows: number) => void;
   onError: (code: string) => void;
   onRetry: () => void;
+  onInfo?: (info: TerminalInfo) => void;
 };
+const DESKTOP_MONO = "ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Cascadia Mono', Consolas, 'Liberation Mono', 'Noto Sans Mono CJK SC', monospace";
 
 /** Independent Tap presentation; the wire frames and grid ownership stay upstream. */
-export function Terminal({ ref, sessionId, stream, active, visible, connected, state, fontSize, t, onInput, onResize, onError, onRetry }: Props) {
+export function Terminal({ ref, sessionId, stream, active, visible, connected, state, fontSize, t, onInput, onResize, onError, onRetry, onInfo }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const terminal = useRef<Xterm | null>(null);
   const options = useRef({ active, visible, connected, state, onInput, onResize, onError });
@@ -42,7 +50,7 @@ export function Terminal({ ref, sessionId, stream, active, visible, connected, s
   const [failed, setFailed] = useState(false);
   const broken = useRef(false);
   const forceNative = useRef(false);
-  const reader = useRef<HTMLPreElement>(null);
+  const reader = useRef<HTMLDivElement>(null);
   const sendVersion = useRef(0);
   useEffect(() => { if (!connected || !active) sendVersion.current++; }, [connected, active]);
 
@@ -62,15 +70,28 @@ export function Terminal({ ref, sessionId, stream, active, visible, connected, s
       }
       return options.current.onInput("\r");
     },
-    focus: () => {
-      if (!options.current.connected || broken.current) return;
-      forceNative.current = true;
-      flushSync(() => setReading(false));
-      const textarea = terminal.current?.textarea;
-      if (textarea) { textarea.readOnly = false; textarea.inputMode = "text"; }
-      terminal.current?.focus(); setDirect(true);
-    },
+    focus: () => enterDirect(),
+    leaveDirect: () => leaveDirect(),
   }), []);
+  function enterDirect() {
+    if (!options.current.connected || broken.current) return;
+    forceNative.current = true;
+    flushSync(() => setReading(false));
+    const textarea = terminal.current?.textarea;
+    if (textarea) { textarea.readOnly = false; textarea.inputMode = "text"; }
+    terminal.current?.focus(); setDirect(true);
+  }
+  function leaveDirect() {
+    const textarea = terminal.current?.textarea;
+    const coarse = matchMedia("(pointer: coarse)").matches;
+    if (textarea) { textarea.readOnly = coarse; textarea.inputMode = coarse ? "none" : "text"; }
+    terminal.current?.blur(); setDirect(false);
+  }
+  const info = useRef(onInfo);
+  info.current = onInfo;
+  useEffect(() => { info.current?.({ size: dimensions, direct }); }, [dimensions, direct]);
+  useEffect(() => { if (!connected && direct) leaveDirect(); }, [connected, direct]);
+  const lines = useMemo(() => readerLines(readerText.split("\n")), [readerText]);
 
   useEffect(() => {
     if (!host.current) return;
@@ -87,10 +108,9 @@ export function Terminal({ ref, sessionId, stream, active, visible, connected, s
     let decoder = new TextDecoder();
     const colors = createTerminalColorQueryFilter();
     const term = new Xterm({
-      allowProposedApi: true, scrollback: 4000, convertEol: false, cursorBlink: false,
-      fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', 'Noto Sans Mono CJK SC', monospace",
-      fontSize, lineHeight: 1.22,
-      theme: { background: "#1c1b22", foreground: "#eeeaf2", cursor: "#c5acf0", selectionBackground: "#71638388" },
+      allowProposedApi: true, scrollback: 5000, convertEol: false, cursorBlink: false, cursorStyle: "bar",
+      fontFamily: DESKTOP_MONO, fontSize, fontWeightBold: 700, lineHeight: 1, minimumContrastRatio: 4.5,
+      theme: { background: "#1c1b22", foreground: "#e4e4e7", cursor: "#c4b5fd", selectionBackground: "#a78bfa55" },
     });
     installTerminalUnicode(term);
     // The native host owns terminal query replies; browsers are mirrors, including Tap.
@@ -141,7 +161,7 @@ export function Terminal({ ref, sessionId, stream, active, visible, connected, s
       usingReader = narrow && !forceNative.current;
       setWide(narrow); setReading(usingReader);
       if (usingReader) readBuffer();
-      setDimensions(`${term.cols} × ${term.rows}`);
+      setDimensions(`${term.cols}×${term.rows}`);
     };
     const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(resize); };
     relayout.current = schedule;
@@ -151,9 +171,11 @@ export function Terminal({ ref, sessionId, stream, active, visible, connected, s
       if (disposed) return;
       if (phoneFont.matches) {
         void document.fonts.load(`${fontSize}px "Tap Mono"`).then(() => {
-          if (!disposed && phoneFont.matches) { term.options.fontFamily = "'Tap Mono', 'Noto Sans Mono CJK SC', monospace"; schedule(); }
+          if (!disposed && phoneFont.matches) {
+            term.options.fontFamily = "'Tap Mono', 'Noto Sans Mono CJK SC', monospace"; term.options.lineHeight = 1.1; schedule();
+          }
         }, () => { if (!disposed) schedule(); });
-      } else { term.options.fontFamily = "'SFMono-Regular', Consolas, 'Liberation Mono', monospace"; schedule(); }
+      } else { term.options.fontFamily = DESKTOP_MONO; term.options.lineHeight = 1; schedule(); }
     };
     phoneFont.addEventListener("change", applyFont); applyFont();
     const input = term.onData((data) => {
@@ -238,28 +260,20 @@ export function Terminal({ ref, sessionId, stream, active, visible, connected, s
     relayout.current();
   }, [fontSize, active, visible, state.controlMode, state.cols, state.rows]);
 
-  return <div className="tap-terminal" aria-label={t("terminal")}>
-    {failed && <div className="tap-terminal-failed" role="alert">{t("unavailable")} <button onClick={onRetry}>{t("reconnect")}</button></div>}
+  return <div className={`tap-terminal${direct ? " is-direct" : ""}`} aria-label={t("terminal")}>
+    {failed && <div className="tap-terminal-failed" role="alert">{t("unavailable")} <button type="button" onClick={onRetry}>{t("reconnect")}</button></div>}
     <div ref={host} className="tap-terminal-screen" style={reading ? { visibility: "hidden" } : undefined} />
-    <pre ref={reader} className="tap-terminal-reader" hidden={!reading}>{readerText}</pre>
-    <div className="tap-terminal-meta">
-      <span>{reading ? t("readingView") : state.controlMode === "desktop" ? t("desktopSize") : t("native")} <span className="tap-mono">{dimensions}</span></span>
-      {wide && <button onClick={() => { forceNative.current = reading; relayout.current(); }}>{t(reading ? "nativeView" : "readingView")}</button>}
-      <button className={direct ? "is-active" : ""} aria-pressed={direct} disabled={!connected || failed} onClick={() => {
-        if (direct) {
-          const textarea = terminal.current?.textarea;
-          const coarse = matchMedia("(pointer: coarse)").matches;
-          if (textarea) { textarea.readOnly = coarse; textarea.inputMode = coarse ? "none" : "text"; }
-          terminal.current?.blur(); setDirect(false);
-        }
-        else {
-          forceNative.current = true;
-          flushSync(() => setReading(false));
-          const textarea = terminal.current?.textarea;
-          if (textarea) { textarea.readOnly = false; textarea.inputMode = "text"; }
-          terminal.current?.focus(); setDirect(true);
-        }
-      }}>{t("direct")}</button>
+    <div ref={reader} className="tap-terminal-reader" hidden={!reading} style={{ fontSize }}>
+      {lines.map(({ text, rule }, index) => <div key={index} className={rule ? "is-rule" : undefined}>{text || "\u00a0"}</div>)}
     </div>
+    {(wide || direct) && <div className="tap-terminal-chips">
+      {wide && !direct && <button type="button" className="tap-terminal-chip" title={t(reading ? "nativeHint" : "readingHint")}
+        onClick={() => { forceNative.current = reading; relayout.current(); }}>
+        {reading ? <MonitorUp size={13} /> : <BookOpenText size={13} />}{t(reading ? "nativeView" : "readingView")}
+      </button>}
+      {direct && <button type="button" className="tap-terminal-chip is-direct" aria-pressed onClick={leaveDirect}>
+        <Keyboard size={13} />{t("directStop")}
+      </button>}
+    </div>}
   </div>;
 }

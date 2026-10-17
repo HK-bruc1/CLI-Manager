@@ -1,28 +1,39 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Square, Keyboard, ImagePlus } from "lucide-react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { ArrowUp, ImagePlus, Keyboard, LoaderCircle, Plus, Square } from "lucide-react";
 import { composerAction, modifyCharacter, type Modifiers } from "./input";
-import type { Translate } from "./i18n";
+import { Menu } from "./Menu";
+import { fill, type Translate } from "./i18n";
 
 /** Draft ownership is per account/device/session, independent of selected display mode. */
-export function Composer({ storageKey, disabled, phone, modifiers, clearModifiers, onCharacter, onSend, onInterrupt, onDirect, onImage, t }: {
-  storageKey: string; disabled: boolean; phone: boolean; modifiers: Modifiers; clearModifiers: () => void;
+export function Composer({ storageKey, disabled, blocked, phone, cli, modifiers, clearModifiers, onPresence,
+  onCharacter, onSend, onInterrupt, onDirect, onImage, t }: {
+  storageKey: string; disabled: boolean; blocked?: string; phone: boolean; cli: string;
+  modifiers: Modifiers; clearModifiers: () => void;
+  /** Focus and draft presence; the key strip steps aside while a message is being written. */
+  onPresence?: (focused: boolean, drafting: boolean) => void;
   onCharacter: (bytes: string) => boolean; onSend: (text: string) => Promise<boolean>;
   onInterrupt: () => void; onDirect: () => void; onImage: (file: File) => Promise<string>; t: Translate;
 }) {
   const [draft, setDraft] = useState(() => { try { return localStorage.getItem(storageKey) ?? ""; } catch { return ""; } });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [adding, setAdding] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const image = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const busy = useRef(false);
   const mounted = useRef(true);
-  const draftRef = useRef(draft); draftRef.current = draft;
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     try { if (draft) localStorage.setItem(storageKey, draft); else localStorage.removeItem(storageKey); } catch { /* Storage may be disabled. */ }
-    if (input.current) { input.current.style.height = "auto"; input.current.style.height = `${Math.min(160, input.current.scrollHeight)}px`; }
-  }, [draft, storageKey]);
+    const element = input.current;
+    if (element) {
+      element.style.height = "auto";
+      element.style.height = `${Math.min(phone ? 150 : 168, element.scrollHeight)}px`;
+    }
+  }, [draft, storageKey, phone]);
   const send = async () => {
     if (busy.current || disabled || composing.current || !draft.trim()) return;
     busy.current = true; setSending(true); setError("");
@@ -36,12 +47,21 @@ export function Composer({ storageKey, disabled, phone, modifiers, clearModifier
         ? t("multiline_paste_unavailable") : t("unknownDelivery"));
     } finally { busy.current = false; if (mounted.current) setSending(false); }
   };
+  // Tool buttons keep the textarea focused, so the phone keyboard does not drop and come back.
+  const keepFocus = (event: PointerEvent) => event.preventDefault();
+  const placeholder = blocked ?? fill(t("nextStep"), { agent: cli }) + (phone ? "" : t("desktopHint"));
+  const [focused, setFocused] = useState(false);
+  const presence = useRef(onPresence);
+  presence.current = onPresence;
+  useEffect(() => { presence.current?.(focused, Boolean(draft)); }, [focused, draft]);
   return <div className="tap-composer-wrap">
-    {error && <div className="tap-inline-error" role="alert">{error}</div>}
-    <div className="tap-composer">
+    {error && <div className="tap-inline-error" role="alert"><span>{error}</span>
+      <button type="button" onClick={() => setError("")}>{t("close")}</button></div>}
+    <div className={`tap-composer${disabled ? " is-disabled" : ""}`}>
       <textarea ref={input} value={draft} maxLength={16_000} rows={1} aria-label={t("input")}
-        placeholder={t("inputHint")} enterKeyHint={phone ? "enter" : "send"}
+        placeholder={placeholder} enterKeyHint={phone ? "enter" : "send"}
         onChange={(event) => setDraft(event.target.value)}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
         onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
         onKeyDown={(event) => {
           if (composing.current || event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -52,31 +72,46 @@ export function Composer({ storageKey, disabled, phone, modifiers, clearModifier
           }
           if (composerAction(event, phone) === "send") { event.preventDefault(); void send(); }
         }} />
-      <div className="tap-composer-tools">
-        <div>
-          <button className="tap-icon" title={t("files")} aria-label={t("files")} disabled={disabled || sending}
-            onPointerDown={(event) => event.preventDefault()} onClick={() => image.current?.click()}><ImagePlus size={17} /></button>
-          <button className="tap-icon" title={t("direct")} aria-label={t("direct")} disabled={disabled}
-            onPointerDown={(event) => event.preventDefault()} onClick={onDirect}><Keyboard size={17} /></button>
-          <button className="tap-icon tap-interrupt" title={t("interrupt")} aria-label={t("interrupt")} disabled={disabled}
-            onPointerDown={(event) => event.preventDefault()} onClick={onInterrupt}><Square size={13} /></button>
+      <div className="tap-composer-row">
+        <div className="tap-composer-tools">
+          <span className="tap-menu-anchor">
+            <button type="button" className="tap-tool is-icon" aria-label={t("add")} title={t("add")}
+              aria-haspopup="menu" aria-expanded={adding} disabled={disabled || sending} onPointerDown={keepFocus} onClick={() => setAdding(!adding)}>
+              <Plus size={17} />
+            </button>
+            <Menu open={adding} onClose={() => setAdding(false)} label={t("add")} placement="up-start">
+              <button type="button" role="menuitem" onClick={() => { setAdding(false); image.current?.click(); }}>
+                <ImagePlus size={16} /><span>{t("uploadImage")}</span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => { setAdding(false); onDirect(); }}>
+                <Keyboard size={16} /><span>{t("direct")}</span>
+              </button>
+            </Menu>
+          </span>
+          <span className="tap-tool-seam" aria-hidden />
+          <button type="button" className="tap-tool is-stop" title={t("interrupt")} aria-label={t("interrupt")}
+            disabled={disabled} onPointerDown={keepFocus} onClick={onInterrupt}>
+            <Square size={12} strokeWidth={2.2} /><span>{t("interrupt")}</span>
+          </button>
         </div>
-        <button className="tap-send" aria-label={t("send")} title={t("sendHint")}
-          disabled={disabled || sending || !draft.trim()} onPointerDown={(event) => event.preventDefault()} onClick={() => void send()}>
-          <ArrowUp size={19} strokeWidth={2.2} />
-        </button>
+        <div className="tap-composer-send">
+          <button type="button" className="tap-send" aria-label={t("send")} title={t("send")}
+            disabled={disabled || sending || !draft.trim()} onPointerDown={keepFocus} onClick={() => void send()}>
+            {sending ? <LoaderCircle size={17} className="tap-spin" /> : <ArrowUp size={18} strokeWidth={2.3} />}
+          </button>
+        </div>
       </div>
       <input ref={image} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden onChange={async (event) => {
-        const file = event.target.files?.[0]; event.target.value = "";
+        const file = event.target.files?.[0];
+        event.target.value = "";
         if (!file || busy.current) return;
         busy.current = true; setSending(true); setError("");
         try {
           const path = await onImage(file);
           if (mounted.current) setDraft((text) => `${text}${text ? " " : ""}${path}`);
-        } catch { if (mounted.current) setError(t("error")); }
+        } catch { if (mounted.current) setError(t("imageFailed")); }
         finally { busy.current = false; if (mounted.current) setSending(false); }
       }} />
     </div>
-    <div className="tap-composer-hint"><span>{sending ? t("sending") : t("sendHint")}</span></div>
   </div>;
 }
