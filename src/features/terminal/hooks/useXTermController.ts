@@ -32,6 +32,7 @@ import { useTerminalDisplay } from "./useTerminalDisplay";
 import { useTerminalInput, type TerminalSuggestionGhostState } from "./useTerminalInput";
 import { registerDesktopViewport } from "../../../shared/lib/terminalSizeOwnership";
 import { resolveClaudeImeCompositionAnchor } from "../lib/terminalImeAnchor";
+import { shouldSwallowImeCompositionKeydown } from "../lib/terminalImeKeyGuard";
 import { copyTextToClipboard, readTextFromClipboard } from "../../../shared/platform/systemClipboard";
 import { formatOsc52Reply } from "../lib/terminalOscParse";
 import { eventToCombo } from "../../workspace/api/useKeyboardShortcuts";
@@ -1255,6 +1256,9 @@ export function useXTermController({ sessionId, isActive = true, isVisible = tru
     contextMenuTarget.addEventListener("contextmenu", onContextMenu);
 
     terminal.attachCustomKeyEventHandler((e) => {
+      // 必须排在所有分支之前：返回 false 会阻止 xterm 的 CompositionHelper 提前提交原始拼音。
+      if (shouldSwallowImeCompositionKeydown(e, isComposingRef.current)) return false;
+
       const isMacSelectAll = (
         osPlatformRef.current === "macos" ||
         (osPlatformRef.current === "unknown" && navigator.platform.toLowerCase().includes("mac"))
