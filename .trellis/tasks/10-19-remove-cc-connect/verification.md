@@ -22,4 +22,11 @@
 - 保留旧设置 tab ID 和只读旧快照/socket 兼容不是保留 cc-connect 运行模块；旧独立程序如仍运行，本轮不会擅自终止。
 
 ## 打包
-待代码提交后执行缓存完整构建 `npm run tauri:build:local -- --bundles nsis`。有 Rust 变更，不使用仅前端重封装；不构建 MSI。包版本/哈希及实际解包校验将在完成后追加。
+- 代码提交 `ba0b98ed` 后，执行 `npm run tauri:build:local -- --bundles nsis`，退出码 0。桌面/Web/Tap 生产构建、缓存 Rust release（5 分 59 秒）及 NSIS 均完成；有 Rust 变更，没有仅前端重封装，没有构建 MSI。
+- 安装包：`F:\gitRepository\CLI-Manager\src-tauri\target\local\release\bundle\nsis\CLI-Manager_1.4.4_x64-setup.exe`。
+- 时间：2026-10-19 18:35:57 +08:00；大小：28,961,070 字节；安装器和解包桌面 exe 的文件版本为 1.4.4。
+- SHA256：`B03BED6E724A740C79301AB4BAF261771E25B376912C326A2E383B018F85B7FF`。旧同名包已在 ignored `.codex/packages/` 原样旁备份并核对旧哈希。
+- 官方 7-Zip archive test 及非安装解包通过（39 文件）。19 个 Web 文件（Tap 15 个）的相对路径/完整清单/SHA256 与构建源树完全相等；11 项 HTML/CSS/manifest 引用均存在，保留 `/tap/assets` 与 `/tap/fonts` 层级。
+- 3 个 helper exe 与 release 源字节完全相同；桌面 exe 与 release 仅在 Tauri 的 `__TAURI_BUNDLE_TYPE_VAR_` 标记处有 NSS/UNK 三字节差异，其他字节完全相同。已核对 tauri-utils 2.8.3 的 NSIS 枚举标记；这是 bundler 注入/还原标记，不是混入旧二进制。
+- 桌面生产 JS 已核对不包含旧 cc-connect IPC 和桌宠托管 action。当前代码提交没有打包生成的额外工作区改动。
+- 本地证据：`.codex/remove-cc-connect-{build,archive-test,extract}.log`、`.codex/remove-cc-connect-package-verification.json`。没有执行安装器、没有启动热部署或改动现有服务；等待用户实机验收。

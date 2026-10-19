@@ -15,12 +15,12 @@
   "branch": "refactor/remove-cc-connect",
   "base_branch": "master",
   "worktree_path": null,
-  "commit": null,
+  "commit": "ba0b98ed",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "1.4.4 NSIS 已构建并解包校验，等待用户实机验收；未推送。SHA256 B03BED6E724A740C79301AB4BAF261771E25B376912C326A2E383B018F85B7FF",
   "meta": {}
 }
