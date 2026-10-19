@@ -19,7 +19,7 @@ Tap 的模块命名跨越 Windows 大小写不敏感文件系统与 TypeScript �
 
 ## 影响分析与工具降级
 
-GitNexus MCP 未暴露；按契约降级为刷新后的 codebase-memory 索引、Web Service Contracts 和定向源码检索。索引识别 `TurnRail` 为导出的 memo 组件变量，但未给出 JSX 调用方，已人工复核 `Conversation` 的实际 JSX 和三个测试依赖表。直接调用方一个，风险低，无桌面/后端影响。
+GitNexus MCP 未暴露；按契约降级为刷新后的 codebase-memory 索引、Web Service Contracts 和定向源码检索。修复前索引识别 `TurnRail` 为导出的 memo 组件变量，但未给出 JSX 调用方，已人工复核 `Conversation` 的实际 JSX 和三个测试依赖表。修复后重新索引识别到唯一直接调用方 `Conversation`，工具按直接调用关系标为 CRITICAL，已向用户告知；实际变更仅模块路径，组件内容哈希完全一致，类型检查和 113 项测试通过，无桌面/后端调用影响。
 
 ## 场景与回滚
 

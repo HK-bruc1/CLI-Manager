@@ -4,7 +4,7 @@
   "title": "Tap Windows 构建兼容",
   "description": "仅消除 Tap 组件与工具模块的大小写文件名冲突，沿用 1.4.4，提交后构建 NSIS，不推送。",
   "status": "in_progress",
-  "dev_type": null,
+  "dev_type": "frontend",
   "scope": "web",
   "package": null,
   "priority": "P2",
@@ -15,12 +15,18 @@
   "branch": "fix/tap-windows-build",
   "base_branch": "master",
   "worktree_path": null,
-  "commit": null,
+  "commit": "be37dd39",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
-  "relatedFiles": [],
-  "notes": "",
+  "relatedFiles": [
+    "apps/web-tap/src/ConversationTurnRail.tsx",
+    "apps/web-tap/src/Conversation.tsx",
+    "apps/web-tap/src/activity.test.mjs",
+    "apps/web-tap/src/conversation.test.mjs",
+    "apps/web-tap/src/timeline.test.mjs"
+  ],
+  "notes": "Windows 类型检查、113 项 Tap 测试、strict architecture 和 1.4.4 NSIS 构建通过；未安装、未推送，待用户实机验收。上游三项 Unicode 测试失败未处理。",
   "meta": {}
 }
