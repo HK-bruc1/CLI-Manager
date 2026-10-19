@@ -39,3 +39,15 @@
 - 本轮 Tap 测试 113/113 通过，独立严格架构检查通过。完整生产构建及新 NSIS 实际解包结果待打包后补充。
 - 提交前按真实 Git diff 复核：仅一行配置、一个已有测试文件增量、相关产品/契约/任务记录；无其他业务代码变化。
 - 本轮没有运行时/前端源码变化，采用官方 `tauri bundle` 复用上一轮完整构建的 1.4.4 二进制与静态资源，并读取修正后的映射重新封装；不声称本轮重新编译了未变化的源码。
+
+### 追加修复产物
+
+- 配置及回归提交：`b9682ae9`，当前分支 `fix/tap-windows-build`，未推送。没有修改业务源码或重新编译后端；二进制来自前述最新主干加 Windows 文件名修复的完整构建。
+- 命令：设置子进程 `CARGO_TARGET_DIR=F:\gitRepository\CLI-Manager\src-tauri\target\local` 后，执行 `npm run tauri -- bundle --config src-tauri/tauri.local.conf.json --bundles nsis`，退出码 0，完成一个 NSIS bundle；保留既有 beforeBundleCommand，没有构建 MSI。
+- 产物仍为 `src-tauri/target/local/release/bundle/nsis/CLI-Manager_1.4.4_x64-setup.exe`，已替换旧包；文件版本 1.4.4，时间 2026-10-19 17:24:49 +08:00，30,405,144 字节。
+- SHA256：`13203B7EC6066FBC96A63F9C3D30D211A49C854C5972C3E6D8B7F03993DB58CE`。
+- 用官方 7-Zip 在项目隔离目录执行 archive test 通过（39 个文件），仅提取 Web 静态文件，不执行安装器或卸载钩子。
+- 真实 NSIS 内 19 个 Web 文件（其中 Tap 15 个）与构建源树的相对路径、文件清单及 SHA256 逐项完全一致，没有缺失、多余或内容不同。
+- HTML、CSS、manifest 的 11 项本地资源引用全部可解析到解包文件，包括 `/tap/assets/index-N8vi0kO4.js`、入口 CSS 和 `/tap/fonts/inconsolata-latin-wght-normal.woff2`；动态分块也已在前述逐文件比对中核验。入口 JS 不再被平铺到 Tap 根目录。
+- 详细本地日志：`.codex/tap-resources-20261019-{before,tests,tap-tests,architecture,build,archive-test,extract}.log`；逐文件及引用核验结果：`.codex/tap-resources-20261019-verification.json`。这些为本地验证产物，不提交。
+- 未覆盖 `F:\cli-manager`，未安装或停止现有应用/9090 服务；浏览器连接新包的实机验收需用户安装并重启 Web 服务后执行，不能把当前旧服务的结果当作新包结果。上游三项 Unicode 测试失败仍保留。
