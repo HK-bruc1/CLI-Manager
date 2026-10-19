@@ -20,7 +20,7 @@ const conversationDeps = {
   "./ConversationActivity": loadModule("ConversationActivity.tsx"),
   // 工具步驟摘要、對話搜尋與跳轉點：純邏輯用實際模組，畫面元件以名稱代替（各自另有測試）。
   "./tools": tools, "./chatFind": chatFind, "./turnRail": turnRail, "./chatScroll": chatScroll,
-  "./ConversationStep": { ConversationStep: "Step" }, "./TurnRail": { TurnRail: "TurnRail" },
+  "./ConversationStep": { ConversationStep: "Step" }, "./ConversationTurnRail": { TurnRail: "TurnRail" },
   "./ChatSearch": { SearchProvider: "SearchProvider", useChatSearch: () => ({ hits: null, bar: null, button: null, layer: null }) },
 };
 
