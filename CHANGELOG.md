@@ -1,5 +1,11 @@
 # Changelog
 
+## [TEMP] - 2026-10-19
+
+### 内置终端输入法修复
+
+- 修复豆包输入法「润色」在组词期间补发 `key="Unidentified"` keydown 时，xterm 提前把未润色原文写入 PTY、`compositionend` 又写入润色结果，导致终端保留两份文本的问题；仅在组词期间拦截该按键，Ctrl+C、Esc、Enter 等按键不受影响。
+
 ## [V1.4.5] - 2026-10-17
 
 ### Tap 对话输入补全
