@@ -3,6 +3,9 @@ import { Store } from "@tauri-apps/plugin-store";
 import type { TerminalSession, PersistedSplit } from "../../../shared/types/index";
 import { getCliManagerDataPaths } from "../../../shared/platform/appPaths";
 import { singleFlight } from "../../../shared/lib/singleFlight";
+import { mergeRetiredSessionBackup, partitionRetiredSessions } from "../lib/retiredSessionMigration";
+import { toast } from "sonner";
+import { translateCurrent } from "../../../shared/i18n/index";
 import {
   migrateTerminalWorkspans,
   sanitizeTerminalWorkspans,
@@ -48,7 +51,18 @@ export const useSessionStore = create<SessionStore>(() => ({
 
   load: singleFlight(async () => {
     const s = await getStore();
-    const sessions = (await s.get<TerminalSession[]>("sessions")) ?? [];
+    const original = (await s.get<TerminalSession[]>("sessions")) ?? [];
+    const { sessions, retired } = partitionRetiredSessions(original);
+    if (retired.length > 0) {
+      const archived = (await s.get<unknown>("retiredRemoteHandoffSessions")) ?? [];
+      if (!Array.isArray(archived)) throw new Error("retired_session_backup_invalid");
+      // 先确认备份落盘，再排除自动恢复；任何失败都不继续启动这些会话。
+      await s.set("retiredRemoteHandoffSessions", mergeRetiredSessionBackup(archived, retired));
+      await s.save();
+      await s.set("sessions", sessions);
+      await s.save();
+      toast.warning(translateCurrent("settings.remoteConnections.retiredSessions", { count: retired.length }));
+    }
     const splits = (await s.get<PersistedSplit[]>("splits")) ?? [];
     const activeSessionId = await s.get<string>("activeSessionId");
     const workspans = migrateTerminalWorkspans(await s.get<unknown>("workspans"));

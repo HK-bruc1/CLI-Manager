@@ -43,7 +43,6 @@ import { useExternalSessionSyncStore } from "../features/history/api/externalSes
 import { useKeyboardShortcuts } from "../features/workspace/api/useKeyboardShortcuts";
 import { useDesktopPetCoordinator } from "../features/desktop-pet/api/useDesktopPetCoordinator";
 import { useWebDeviceBridge } from "../features/terminal/hooks/useWebDeviceBridge";
-import { useRemoteHandoffCoordinator } from "../features/remote/api/useRemoteHandoffCoordinator";
 import { useUpdateStore } from "../features/settings/api/updateStore";
 import { useReplayStore } from "../features/terminal/api/replayStore";
 import { useTerminalStore, type CliHookPayload } from "../features/terminal/state";
@@ -935,7 +934,6 @@ function App() {
     }
   }, []);
 
-  useRemoteHandoffCoordinator(startupReady);
 
   useDesktopPetCoordinator({
     appReady: startupReady,

@@ -28,7 +28,6 @@ use super::ssh_agent_bridge::SshAgentBridgeManager;
 use crate::claude_hook::{
     approval_aware_hook_sink, remote_hook_payload_from_spool, spawn_hook_listener, HookPayloadSink,
 };
-use crate::commands::cc_connect::handoff_notification::RemoteHandoffNotifier;
 use crate::pty::manager::PtyManager;
 use crate::ssh_launch::SshLaunchPlan;
 use crate::third_party_notification::DispatcherHandle;
@@ -1016,7 +1015,6 @@ impl DaemonServer {
 
         let hook_host = Arc::clone(&server.host);
         let dispatcher = DispatcherHandle::start("daemon");
-        let handoff_notifier = RemoteHandoffNotifier::start();
         let delivery_sink: HookPayloadSink = Arc::new(move |payload| {
             // 仅当没有已连接的前端客户端时（app 已彻底退到后台，例如托盘退出后
             // 转入后台继续执行）才拉起 app 处理审批或回答。app 正在运行时，事件会通过
@@ -1029,7 +1027,6 @@ impl DaemonServer {
             dispatcher.try_enqueue(payload.to_notification_job());
             match serde_json::to_value(&payload) {
                 Ok(value) => {
-                    handoff_notifier.try_enqueue(value.clone());
                     hook_host.update_task_status_from_hook(&value);
                     hook_host.broadcast_hook(value);
                 }

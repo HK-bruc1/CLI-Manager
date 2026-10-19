@@ -53,6 +53,10 @@ pub mod codex_app_server_proxy;
 #[path = "features/statusline/codex.rs"]
 pub mod codex_statusline;
 mod commands;
+#[path = "infrastructure/process/agent_launcher.rs"]
+pub(crate) mod agent_launcher;
+#[path = "infrastructure/storage/legacy_remote_state.rs"]
+pub(crate) mod legacy_remote_state;
 #[path = "infrastructure/process/conpty_sideload.rs"]
 mod conpty_sideload;
 #[path = "infrastructure/diagnostics/crash_reporter.rs"]
@@ -375,9 +379,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            if commands::cc_connect::handle_single_instance_args(app, &args) {
-                return;
-            }
             if let Some(session_id) = background_session_arg(&args) {
                 set_pending_background_session(app, session_id);
             }
@@ -483,9 +484,6 @@ pub fn run() {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_millis(750));
-                    if let Err(err) = commands::cc_connect::auto_start(&handle) {
-                        log::warn!("cc-connect auto-start skipped: {err}");
-                    }
                     if let Err(err) = commands::web_device::auto_start(&handle) {
                         log::warn!("web device auto-start skipped: {err}");
                     }
@@ -565,7 +563,6 @@ pub fn run() {
         .manage(git_watcher::GitWatcherBridge::new())
         .manage(live_server::LiveServerManager::new())
         .manage(commands::subagent_transcript::SubagentTranscriptBridge::new())
-        .manage(commands::cc_connect::CcConnectManager::new())
         .manage(commands::web_device::WebDeviceManager::new())
         .manage(commands::web_server::WebServerManager::default())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -622,25 +619,6 @@ pub fn run() {
             commands::app_data::app_get_data_storage_status,
             commands::app_data::app_inspect_data_dir,
             commands::app_data::app_prepare_data_dir_switch,
-            commands::cc_connect::cc_connect_get_status,
-            commands::cc_connect::cc_connect_inspect_executable,
-            commands::cc_connect::cc_connect_check_update,
-            commands::cc_connect::cc_connect_update,
-            commands::cc_connect::cc_connect_save_profile,
-            commands::cc_connect::cc_connect_clear_credentials,
-            commands::cc_connect::cc_connect_weixin_authorization_start,
-            commands::cc_connect::cc_connect_weixin_authorization_status,
-            commands::cc_connect::cc_connect_weixin_authorization_cancel,
-            commands::cc_connect::cc_connect_start,
-            commands::cc_connect::cc_connect_stop,
-            commands::cc_connect::cc_connect_restart,
-            commands::cc_connect::cc_connect_get_logs,
-            commands::cc_connect::handoff::cc_connect_handoff_status,
-            commands::cc_connect::handoff::cc_connect_handoff_platforms,
-            commands::cc_connect::handoff::cc_connect_handoff_preflight,
-            commands::cc_connect::handoff::cc_connect_handoff_start,
-            commands::cc_connect::handoff::cc_connect_handoff_cancel,
-            commands::cc_connect::handoff_notification::cc_connect_handoff_notification_status,
             take_pending_background_session,
             commands::desktop_pet::desktop_pet_catalog,
             commands::desktop_pet::desktop_pet_list_installed,
@@ -1041,8 +1019,6 @@ pub fn run() {
         .run(|app, event| {
             if let tauri::RunEvent::Exit = &event {
                 app.state::<live_server::LiveServerManager>().shutdown();
-                app.state::<commands::cc_connect::CcConnectManager>()
-                    .shutdown();
                 commands::web_device::shutdown(app);
                 commands::web_server::shutdown(
                     app.state::<commands::web_server::WebServerManager>()

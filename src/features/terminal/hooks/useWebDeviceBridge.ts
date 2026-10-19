@@ -585,7 +585,7 @@ async function publishWorkspace(workspaceOnly = false) {
     });
     const terminalState = useTerminalStore.getState();
     const terminals = terminalState.sessions
-      .filter((session) => (!session.kind || session.kind === "pty") && session.projectId && session.environmentType !== "ssh" && !session.remoteHandoff)
+      .filter((session) => (!session.kind || session.kind === "pty") && session.projectId && session.environmentType !== "ssh")
       .map((session) => ({ sessionId: session.id, projectId: session.projectId!, worktreeId: session.worktreeId ?? null, title: session.title }));
     const workspace: WebWorkspaceSnapshot = {
       terminals,

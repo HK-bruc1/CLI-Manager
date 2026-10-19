@@ -427,7 +427,7 @@ async function transcriptContext(payload: Payload) {
   const session = useTerminalStore.getState().sessions.find((item) => item.id === sessionId);
   if (!session || session.projectId !== context.project.id
     || (session.worktreeId ?? null) !== (context.worktree?.id ?? null)
-    || session.environmentType === "ssh" || session.remoteHandoff || (session.kind && session.kind !== "pty"))
+    || session.environmentType === "ssh" || (session.kind && session.kind !== "pty"))
     managementError("history_context_not_found");
   numberValue(payload, "before", 0, 0, 10_000_000);
   return { ...context, session };

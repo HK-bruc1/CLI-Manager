@@ -42,7 +42,7 @@ import { ModelPricingSettingsPage } from "../components/pages/ModelPricingSettin
 import { AboutSettingsPage } from "../components/pages/AboutSettingsPage";
 import { SponsorsSettingsPage } from "../components/pages/SponsorsSettingsPage";
 import { DesktopPetSettingsPage } from "../components/pages/DesktopPetSettingsPage";
-import { CcConnectSettingsPage } from "../components/pages/CcConnectSettingsPage";
+import { RemoteConnectionsSettingsPage } from "../components/pages/RemoteConnectionsSettingsPage";
 import { SshHostsSettingsPage } from "../components/pages/SshHostsSettingsPage";
 import { GlobalExtensionsPage } from "../../extensions";
 import { useMcpSaveWorkflow } from "../../extensions/api/mcpSaving";
@@ -173,10 +173,11 @@ const SETTINGS_TAB_CONFIG: Record<SettingsTab, SettingsTabConfig> = {
     icon: Coins,
     searchPlaceholder: "settings.tabs.modelPricing.search",
   },
+  // Retain the persisted sidebar ID; this page now owns Web connections only.
   "cc-connect": {
-    label: "settings.tabs.ccConnect.label",
-    title: "settings.tabs.ccConnect.title",
-    description: "settings.tabs.ccConnect.description",
+    label: "settings.tabs.remoteConnections.label",
+    title: "settings.tabs.remoteConnections.title",
+    description: "settings.tabs.remoteConnections.description",
     icon: RadioTower,
   },
   "ssh-hosts": {
@@ -346,7 +347,7 @@ export function SettingsModal({ open, onClose, onAfterClose, initialTab, onActiv
     if (activeTab === "native-providers") return <NativeProviderSettingsPage searchValue={searchValue} />;
     if (activeTab === "sponsors") return <SponsorsSettingsPage />;
     if (activeTab === "model-pricing") return <ModelPricingSettingsPage searchValue={searchValue} />;
-    if (activeTab === "cc-connect") return <CcConnectSettingsPage />;
+    if (activeTab === "cc-connect") return <RemoteConnectionsSettingsPage />;
     if (activeTab === "ssh-hosts") return <SshHostsSettingsPage searchValue={searchValue} onTerminalOpened={onClose} />;
     if (activeTab === "sync") return <SyncSettingsPage />;
     if (activeTab === "history-sources") {

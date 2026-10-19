@@ -112,7 +112,7 @@ type LastSettingsTab =
   | "native-providers"
   | "sponsors"
   | "model-pricing"
-  | "cc-connect"
+  | "cc-connect" // Legacy persisted ID for the Web remote-connections page.
   | "ssh-hosts"
   | "sync"
   | "history-sources"
@@ -487,11 +487,6 @@ export interface Settings {
   hookSettingsSectionsExpanded: HookSettingsSectionsExpanded;
   thirdPartyHookNotificationsEnabled: boolean;
   thirdPartyHookTargets: ThirdPartyHookTarget[];
-  remoteHandoffNotificationsEnabled: boolean;
-  remoteHandoffCompletionNotificationsEnabled: boolean;
-  remoteHandoffPermissionNotificationsEnabled: boolean;
-  remoteHandoffProgressNotificationsEnabled: boolean;
-  remoteHandoffProgressIntervalMinutes: number;
   claudeHookConfigDir: string | null;
   claudeHookAutoRepairKnownInstalled: boolean;
   claudeHookAutoRepairNoticeShown: boolean;
@@ -701,11 +696,6 @@ const DEFAULTS: Settings = {
   hookSettingsSectionsExpanded: { ...HOOK_SETTINGS_SECTIONS_EXPANDED_DEFAULT },
   thirdPartyHookNotificationsEnabled: true,
   thirdPartyHookTargets: [],
-  remoteHandoffNotificationsEnabled: true,
-  remoteHandoffCompletionNotificationsEnabled: true,
-  remoteHandoffPermissionNotificationsEnabled: true,
-  remoteHandoffProgressNotificationsEnabled: true,
-  remoteHandoffProgressIntervalMinutes: 5,
   claudeHookConfigDir: null,
   claudeHookAutoRepairKnownInstalled: false,
   claudeHookAutoRepairNoticeShown: false,
@@ -1718,27 +1708,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         ? entries.thirdPartyHookNotificationsEnabled
         : DEFAULTS.thirdPartyHookNotificationsEnabled;
     entries.thirdPartyHookTargets = sanitizeThirdPartyHookTargets(entries.thirdPartyHookTargets);
-    entries.remoteHandoffNotificationsEnabled =
-      typeof entries.remoteHandoffNotificationsEnabled === "boolean"
-        ? entries.remoteHandoffNotificationsEnabled
-        : DEFAULTS.remoteHandoffNotificationsEnabled;
-    entries.remoteHandoffCompletionNotificationsEnabled =
-      typeof entries.remoteHandoffCompletionNotificationsEnabled === "boolean"
-        ? entries.remoteHandoffCompletionNotificationsEnabled
-        : DEFAULTS.remoteHandoffCompletionNotificationsEnabled;
-    entries.remoteHandoffPermissionNotificationsEnabled =
-      typeof entries.remoteHandoffPermissionNotificationsEnabled === "boolean"
-        ? entries.remoteHandoffPermissionNotificationsEnabled
-        : DEFAULTS.remoteHandoffPermissionNotificationsEnabled;
-    entries.remoteHandoffProgressNotificationsEnabled =
-      typeof entries.remoteHandoffProgressNotificationsEnabled === "boolean"
-        ? entries.remoteHandoffProgressNotificationsEnabled
-        : DEFAULTS.remoteHandoffProgressNotificationsEnabled;
-    entries.remoteHandoffProgressIntervalMinutes =
-      typeof entries.remoteHandoffProgressIntervalMinutes === "number"
-        && Number.isFinite(entries.remoteHandoffProgressIntervalMinutes)
-        ? Math.min(60, Math.max(1, Math.round(entries.remoteHandoffProgressIntervalMinutes)))
-        : DEFAULTS.remoteHandoffProgressIntervalMinutes;
     entries.claudeHookConfigDir =
       typeof entries.claudeHookConfigDir === "string" && entries.claudeHookConfigDir.trim()
         ? entries.claudeHookConfigDir
