@@ -11,10 +11,11 @@ use client_transport::{frame_payload_bytes, ClientTransport, ClientWriter};
 mod pty_events;
 use pty_events::DaemonPtyEventSink;
 mod hook_status;
+mod request_execution;
+mod request_queue;
+mod session_inventory;
 #[cfg(test)]
-use hook_status::{
-    map_hook_event_to_task_status, map_hook_event_to_task_status_for_payload,
-};
+use hook_status::{map_hook_event_to_task_status, map_hook_event_to_task_status_for_payload};
 
 use super::discovery::{remove_daemon_info, write_daemon_info_exclusive, DaemonInfo};
 use super::protocol::{
@@ -122,6 +123,7 @@ pub struct DaemonHost {
     ssh_agent_bridges: SshAgentBridgeManager,
     routing: Mutex<RoutingRuntime>,
     spool_dir: PathBuf,
+    requests: request_queue::RequestQueue,
 }
 
 impl DaemonHost {
@@ -138,6 +140,7 @@ impl DaemonHost {
     fn with_spool_dir(spool_dir: PathBuf) -> Self {
         Self {
             pty: PtyManager::new(),
+            requests: request_queue::RequestQueue::new(),
             sessions: Mutex::new(HashMap::new()),
             clients: Mutex::new(HashMap::new()),
             last_idle_since: Mutex::new(Instant::now()),
@@ -510,43 +513,6 @@ impl DaemonHost {
         self.clients.lock().map(|c| c.len()).unwrap_or(0)
     }
 
-    /// 总 buffer 超限时从最旧的 exited 会话开始整会话丢弃（契约资源上限）。
-    // 总回放内存超限时按创建时间移除已退出会话，保留存活会话。
-    fn enforce_total_buffer_cap(&self) {
-        let Ok(mut sessions) = self.sessions.lock() else {
-            return;
-        };
-        let mut total: usize = sessions
-            .values()
-            .filter_map(|session| session.lock().ok().map(|entry| entry.buffer.total_bytes))
-            .sum();
-        if total <= TOTAL_BUFFER_MAX_BYTES {
-            return;
-        }
-        let mut exited: Vec<(String, u64, usize)> = sessions
-            .iter()
-            .filter_map(|(id, session)| {
-                let entry = session.lock().ok()?;
-                (!entry.meta.alive).then(|| {
-                    (
-                        id.clone(),
-                        entry.meta.created_at_ms,
-                        entry.buffer.total_bytes,
-                    )
-                })
-            })
-            .collect();
-        exited.sort_by_key(|(_, created, _)| *created);
-        for (id, _, bytes) in exited {
-            if total <= TOTAL_BUFFER_MAX_BYTES {
-                break;
-            }
-            sessions.remove(&id);
-            total -= bytes;
-            log::warn!("daemon dropped exited session buffer to enforce cap: id={id}");
-        }
-    }
-
     /// 向所有 attach 了该会话的客户端推送一帧；写失败的客户端跳过（由其读线程负责回收）。
     // 向已订阅客户端推送非输出帧；attach 期间暂存，发送失败则关闭对应 writer。
     fn push_to_attached(&self, session_id: &str, frame: &DaemonFrame) {
@@ -676,6 +642,7 @@ impl DaemonHost {
         let Some(session) = self.get_session(session_id) else {
             return;
         };
+        request_queue::stage(request_queue::Stage::SessionLock);
         let Ok(entry) = session.lock() else {
             return;
         };
@@ -722,6 +689,7 @@ impl DaemonHost {
         // Read the bounded memory/spool replay while holding only the session
         // lock. In particular, never perform disk I/O while holding the global
         // clients lock: another session must remain able to enqueue output.
+        request_queue::stage(request_queue::Stage::ReplayRead);
         let retained_frames = entry.buffer.live_frames();
         let Ok(mut clients) = self.clients.lock() else {
             return;
@@ -1163,6 +1131,7 @@ impl DaemonServer {
             }
         }
 
+        self.host.requests.cancel_client(client_id);
         if let Ok(mut clients) = self.host.clients.lock() {
             if let Some(client) = clients.remove(&client_id) {
                 client.writer.close();
@@ -1262,128 +1231,20 @@ impl DaemonServer {
                     }
                 },
                 WebSocketClientMessage::Binary(data) => {
-                    if !self.handle_binary_frame(client_id, &data, &writer) {
+                    if !self.queue_binary_frame(client_id, data.to_vec(), &writer) {
                         break;
                     }
                 }
             }
         }
 
+        self.host.requests.cancel_client(client_id);
         if let Ok(mut clients) = self.host.clients.lock() {
             if let Some(client) = clients.remove(&client_id) {
                 client.writer.close();
             }
         }
         log::debug!("daemon websocket client disconnected ({peer}, id={client_id})");
-    }
-
-    // 仅处理已 attach 会话的二进制输入或检查点，校验失败时要求关闭连接。
-    fn handle_binary_frame(&self, client_id: u64, data: &[u8], writer: &Arc<ClientWriter>) -> bool {
-        let frame = match decode_binary_terminal_frame(data) {
-            Ok(frame) => frame,
-            Err(message) => {
-                let _ = writer.send_frame(&DaemonFrame::Err { id: 0, message });
-                return false;
-            }
-        };
-        let attached = self
-            .host
-            .clients
-            .lock()
-            .ok()
-            .and_then(|clients| {
-                clients
-                    .get(&client_id)
-                    .map(|client| client.attached.contains(&frame.session_id))
-            })
-            .unwrap_or(false);
-        if !attached || !is_valid_session_id(&frame.session_id) {
-            let _ = writer.send_frame(&DaemonFrame::Err {
-                id: 0,
-                message: "binary frame session is not attached".to_string(),
-            });
-            return false;
-        }
-        match frame.kind {
-            BINARY_KIND_INPUT => self
-                .host
-                .pty
-                .write_bytes(&frame.session_id, &frame.data)
-                .is_ok(),
-            BINARY_KIND_CHECKPOINT => {
-                let result = self
-                    .host
-                    .get_session(&frame.session_id)
-                    .ok_or_else(|| "session not found".to_string())
-                    .and_then(|session| {
-                        let mut entry = session
-                            .lock()
-                            .map_err(|_| "session state unavailable".to_string())?;
-                        let latest_sequence = entry.next_sequence.saturating_sub(1);
-                        if frame.sequence > latest_sequence {
-                            return Err("checkpoint sequence is ahead of daemon output".to_string());
-                        }
-                        entry.buffer.accept_checkpoint(
-                            frame.cols,
-                            frame.rows,
-                            frame.sequence,
-                            frame.data,
-                        )?;
-                        entry.meta.replay_available = entry.buffer.replay_available();
-                        entry.meta.replay_truncated = entry.buffer.truncated;
-                        Ok(())
-                    });
-                let response = match result {
-                    Ok(()) => DaemonFrame::CheckpointAccepted {
-                        session_id: frame.session_id,
-                        sequence: frame.sequence,
-                    },
-                    Err(message) => DaemonFrame::CheckpointRejected {
-                        session_id: frame.session_id,
-                        sequence: frame.sequence,
-                        message,
-                    },
-                };
-                writer.send_frame(&response).is_ok()
-            }
-            _ => false,
-        }
-    }
-
-    /// 返回 false 表示应结束该连接。
-    // 分发客户端请求；List 先补发 Hook，SSH 请求后台处理，Attached 应答之后才冲刷实时缓冲。
-    fn dispatch(
-        self: &Arc<Self>,
-        client_id: u64,
-        frame: ClientFrame,
-        writer: &Arc<ClientWriter>,
-    ) -> bool {
-        // 积压 hook 上报在首次 List 时补发（而非连接瞬间）：此时前端 webview
-        // 的事件监听器已就绪（恢复流程先查会话列表），避免 re-emit 被丢。
-        if matches!(frame, ClientFrame::List { .. }) {
-            self.host.flush_hook_cache_to(writer);
-        }
-        if matches!(frame, ClientFrame::SshAgentRequest { .. }) {
-            let server = Arc::clone(self);
-            let writer = Arc::clone(writer);
-            std::thread::spawn(move || {
-                let reply = server.handle_frame(client_id, frame);
-                let _ = writer.send_frame(&reply);
-            });
-            return true;
-        }
-        let attach_session_id = match &frame {
-            ClientFrame::Attach { session_id, .. } => Some(session_id.clone()),
-            _ => None,
-        };
-        let reply = self.handle_frame(client_id, frame);
-        let sent = writer.send_frame(&reply).is_ok();
-        if sent && matches!(reply, DaemonFrame::Attached { .. }) {
-            if let Some(session_id) = attach_session_id {
-                self.host.complete_attach(client_id, &session_id);
-            }
-        }
-        sent
     }
 
     // 处理已鉴权的控制帧并构造应答；会话协调只报告诊断，不按 UI 列表回收 daemon 会话。
@@ -1394,19 +1255,10 @@ impl DaemonServer {
                 message: "already authenticated".to_string(),
             },
             ClientFrame::Ping { id } => DaemonFrame::Pong { id },
-            ClientFrame::List { id } => {
-                let session_handles = self
-                    .host
-                    .sessions
-                    .lock()
-                    .map(|sessions| sessions.values().cloned().collect::<Vec<_>>())
-                    .unwrap_or_default();
-                let sessions = session_handles
-                    .into_iter()
-                    .filter_map(|session| session.lock().ok().map(|entry| entry.meta.clone()))
-                    .collect();
-                DaemonFrame::Sessions { id, sessions }
-            }
+            ClientFrame::List { id } => match self.host.session_metadata() {
+                Ok(sessions) => DaemonFrame::Sessions { id, sessions },
+                Err(message) => err_frame(id, message),
+            },
             ClientFrame::Create {
                 id,
                 session_id,
@@ -1450,6 +1302,7 @@ impl DaemonServer {
                 if !is_valid_session_id(&session_id) {
                     return err_frame(id, "invalid session id");
                 }
+                request_queue::stage(request_queue::Stage::PtyWrite);
                 match self.host.pty.write(&session_id, &data) {
                     Ok(()) => DaemonFrame::Ok { id },
                     Err(message) => DaemonFrame::Err { id, message },
@@ -1479,6 +1332,7 @@ impl DaemonServer {
                 if !is_valid_session_id(&session_id) {
                     return err_frame(id, "invalid session id");
                 }
+                request_queue::stage(request_queue::Stage::PtyResize);
                 match self
                     .host
                     .pty
@@ -1528,67 +1382,7 @@ impl DaemonServer {
                 id,
                 session_id,
                 after_sequence,
-            } => {
-                if !is_valid_session_id(&session_id) {
-                    return err_frame(id, "invalid session id");
-                }
-                // Keep the replay snapshot and subscription registration atomic
-                // relative to on_output (sessions -> clients). Output produced
-                // before this block is replayed; output produced after it is live.
-                let attach_info = self.host.get_session(&session_id).and_then(|session| {
-                    let entry = session.lock().ok()?;
-                    let meta = entry.meta.clone();
-                    let oldest_sequence = entry.buffer.oldest_sequence().unwrap_or(0);
-                    let replay_reset = after_sequence
-                        .map(|sequence| sequence.saturating_add(1) < oldest_sequence)
-                        .unwrap_or(true);
-                    let replay_entries = if replay_reset {
-                        entry.buffer.replay_entries()
-                    } else {
-                        entry.buffer.replay_entries_after(after_sequence)
-                    };
-                    let latest_sequence = entry.next_sequence.saturating_sub(1);
-                    let mut clients = self.host.clients.lock().ok()?;
-                    let client = clients.get_mut(&client_id)?;
-                    client.attached.insert(session_id.clone());
-                    client.unacknowledged_chars.insert(session_id.clone(), 0);
-                    client.flow_control_paused.remove(&session_id);
-                    client
-                        .last_sent_sequence
-                        .insert(session_id.clone(), latest_sequence);
-                    client
-                        .last_acknowledged_sequence
-                        .insert(session_id.clone(), latest_sequence);
-                    client.attaching.insert(session_id.clone(), Vec::new());
-                    Some((
-                        meta,
-                        replay_entries,
-                        latest_sequence,
-                        replay_reset,
-                        oldest_sequence,
-                    ))
-                });
-                match attach_info {
-                    Some((
-                        meta,
-                        replay_entries,
-                        latest_sequence,
-                        replay_reset,
-                        oldest_sequence,
-                    )) => DaemonFrame::Attached {
-                        id,
-                        session_id,
-                        replay_base64: String::new(),
-                        replay: replay_entries,
-                        latest_sequence,
-                        meta,
-                        replay_reset,
-                        replay_truncated: false,
-                        oldest_sequence,
-                    },
-                    None => err_frame(id, "session not found"),
-                }
-            }
+            } => self.attach_session(client_id, id, session_id, after_sequence),
             ClientFrame::Detach { id } => {
                 if let Ok(mut clients) = self.host.clients.lock() {
                     if let Some(client) = clients.get_mut(&client_id) {
@@ -1942,5 +1736,7 @@ fn maybe_activate_app_for_hook(payload: &crate::claude_hook::ClaudeHookPayload) 
     }
 }
 
+#[cfg(test)]
+mod recovery_tests;
 #[cfg(test)]
 mod tests;

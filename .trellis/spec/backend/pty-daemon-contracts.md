@@ -296,6 +296,57 @@ command.creation_flags(CREATE_NO_WINDOW);
 ```
 
 
+## Scenario: Recover attach failures and isolate blocked host requests (V1.4.5)
+
+### 1. Scope / Trigger
+
+修改 `PtyHostSocket` 恢复流程、daemon reader/dispatch、会话表治理或慢请求诊断时适用。
+
+### 2. Signatures
+
+- 公共 `attach(sessionId, replayFromStart?, resumeAfterSequence?) -> Promise<PtyHostAttachResult>` 保留 boolean 失败约定；内部单次尝试保留 timeout/missing/remote/cancelled 类别。
+- `RequestQueue::submit(key, client, request, operation, bytes, work) -> bool`：false 必须断开客户端，不能当成已执行。
+- `session_metadata() -> Result<Vec<SessionMeta>, &'static str>`：忙或不可读时返回错误，禁止返回遗漏会话的成功列表。
+
+### 3. Contracts
+
+- 恢复意图独立于 socket OPEN；每 transport 只有一个恢复流程与一个 timer，同会话最多一个 attach 在途。首次断连 250ms，失败后 1/2/5 秒退避，5 秒封顶；每轮最多四个 attach。
+- 仅已建立会话进入自动恢复；首次 attach 失败由调用方清理。精确 `session not found` 是终止结果；锁中毒、客户端断开或其他临时错误不得伪装 missing。
+- 二进制 replay 没有 request id。attach 超时后须撤销连接并以 committed sequence 重连，禁止在旧连接中把迟到 replay 拼入下一次恢复。auth_ok 前不得发送业务请求。
+- close/closeAll/dispose/reset 取消对应恢复意图；连接和生命周期代次隔离旧应答、旧事件及迟到监听器。关闭不自动重跑 create/用户输入。
+- 宿主固定四个 worker；所有客户端同会话 key 共用 FIFO。队列最多 256 项/16 MiB，每客户端最多 64 项；断连清除该客户端排队操作。正在执行的系统调用不强杀，四个 worker 全部阻塞时业务操作仍可能等待，心跳独立于该队列。
+- CloseAll/Detach/Shutdown 使用全局顺序屏障，不能越过之前的会话任务；Ping/List/Reconcile 在 reader 上快速响应。SSH/routing/status 使用独立 key。JSON/binary 输入、checkpoint、ACK 和 attach 使用同一会话队列。
+- buffer 治理先克隆会话引用、释放表锁，再 try_lock 检查 entry；忙会话按单会话容量上界计费，移除前核对 Arc 身份与 exited 状态，绝不移除活跃会话。
+- writer 网络写等待最多 5 秒，失败后标记 closed 并清空队列；全局 clients 锁内仅入队，不执行网络写。
+- 独立 reporter 每 5 秒查看在途任务，持续慢请求每 30 秒最多一批。只写静态操作/阶段、client/request 数字、session 散列、耗时、队列数量/字节，不写原始请求正文；使用既有滚动 writer，release/dev 分别为 `pty-host.log` / `pty-host.dev.log`，写失败不阻断请求。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 已有会话 attach 返回临时错误 | 保留恢复集合，日志 partial，继续退避 |
+| attach 超时 | 换连接隔离迟到回放；旧会话仍待恢复 |
+| 明确 session missing | 移除恢复集合，不再重试 |
+| A entry 被持有 | 缓冲治理立即返回；同连接 Ping/B attach 仍可推进 |
+| List 有忙会话 | 返回错误，不伪造空/部分列表 |
+| 输入队列满或 writer 已失效 | 断开该连接，不执行或自动重放未接收的输入 |
+
+### 5. Good / Base / Bad Cases
+
+- Good：A attach 阻塞，B 和 Ping 先返回；释放 A 后 Attached/replay/live 顺序完整。
+- Base：临时恢复失败持续重试，所有会话恢复或明确终结后才记录 completed。
+- Bad：仅放宽心跳时间、每请求无限 spawn、把 pending 错误吞成 false 后直接记录 completed。
+
+### 6. Tests Required
+
+`scripts/ptyHostSocket.test.mjs` 覆盖超时/临时错误、missing、多会话、单流程、生命周期取消与日志脱敏；`server/recovery_tests.rs` 覆盖受控锁阻塞与 writer 失败；`request_queue/tests.rs` 覆盖 FIFO/全局屏障、容量与取消、在途诊断脱敏。回归 server/protocol、TerminalProcessManager、replay/remount、类型/编译与严格架构检查。
+
+### 7. Wrong vs Correct
+
+Wrong：持 `sessions` 表锁遍历并阻塞等待每个 entry；reader 直接执行可能无限等待的 PTY write。
+
+Correct：表锁只取共享引用；同会话请求经有界 FIFO worker 执行，reader 保持心跳响应，entry 慢操作可由独立诊断观察。
+
 ## Opt-in actual-user Conda PATH regression
 
 `src-tauri/tests/windows_conda_path_smoke.rs` runs the production `PtyManager` in real Windows ConPTY with the actual user's existing Windows PowerShell/Conda profile. It requires an already activated Conda parent and installed `dsh`/`dsh-tui`, preserves USERPROFILE/HOME and supplies no PATH override. The probe uses command discovery only, returns booleans for npm/dsh/dsh-TUI/base visibility, and never prints the environment or performs model requests. RAII closes only the test's own PTY.
