@@ -7,7 +7,7 @@ import { groupTurns } from "./turns.ts";
 import * as format from "./format.ts";
 import * as tools from "./tools.ts";
 import * as chatFind from "./chatFind.ts";
-import * as turnRail from "./turnRail.ts";
+import * as rail from "./rail.ts";
 import * as chatScroll from "./chatScroll.ts";
 import { hookHarness, loadModule, nodes, textContent } from "../tests/reactHarness.mjs";
 
@@ -15,7 +15,7 @@ const deps = (react) => ({
   ...(react ? { react } : {}), "react-markdown": { default: "Markdown" }, "remark-gfm": {},
   "./turns": { groupTurns }, "./format": format, "./i18n": { fill }, "./ConversationCodeBlock": {},
   "./ConversationActivity": { ConversationActivity: "Activity" }, "./ConversationStep": { ConversationStep: "Step" },
-  "./tools": tools, "./chatFind": chatFind, "./turnRail": turnRail, "./chatScroll": chatScroll, "./ConversationTurnRail": { TurnRail: "TurnRail" },
+  "./tools": tools, "./chatFind": chatFind, "./rail": rail, "./chatScroll": chatScroll, "./ConversationTurnRail": { TurnRail: "TurnRail" },
   "./ChatSearch": { SearchProvider: "SearchProvider", useChatSearch: () => ({ hits: null, bar: null, button: null, layer: null }) },
 });
 const part = (id, kind, text, extra = {}) => ({ id, kind, text, ...extra });

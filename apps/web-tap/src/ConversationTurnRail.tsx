@@ -9,7 +9,7 @@ import { scrollToItem } from "./chatScroll";
 import { clock } from "./format";
 import { fill, type Translate } from "./i18n";
 import { PHONE_QUERY } from "./preferences";
-import { activeTick, buckets, readingAt, type RailPrompt } from "./turnRail";
+import { activeTick, buckets, readingAt, type RailPrompt } from "./rail";
 
 /** 刻度之間至少隔這麼多 px；提問太多時一條刻度代表好幾輪。 */
 const PITCH = 8;

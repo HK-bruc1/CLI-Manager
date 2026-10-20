@@ -13,7 +13,7 @@ import { ConversationActivity } from "./ConversationActivity";
 import { ConversationStep } from "./ConversationStep";
 import { SearchProvider, useChatSearch } from "./ChatSearch";
 import { TurnRail } from "./ConversationTurnRail";
-import { railPrompts, type RailPrompt } from "./turnRail";
+import { railPrompts, type RailPrompt } from "./rail";
 import { captureAnchor, restoreAnchor, scrollToItem, type ScrollAnchor } from "./chatScroll";
 import { hitIn, type Hits } from "./chatFind";
 import { processText, stepViews, turnChanges, type TurnChanges } from "./tools";
